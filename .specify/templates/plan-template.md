@@ -31,7 +31,17 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- Confirm the feature preserves the learning-only, non-production security
+  posture and documents any custom-crypto limitation it touches.
+- Confirm the design stays within Linux `/dev/net/tun`, UDP transport, star
+  topology, single-threaded `epoll`, and ops-level NAT unless the constitution
+  has been amended.
+- Identify the owning C module(s) and any header/interface changes across
+  handshake, crypto, session manager, transport, TUN, packet handling, or config.
+- For protocol work, include handshake/session state transitions, message
+  formats, timeout/retry behavior, and teardown rules before data-plane work.
+- Define tests or manual verification for crypto, packet parsing, session lookup,
+  event-loop integration, and malformed input handling as applicable.
 
 ## Project Structure
 

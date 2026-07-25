@@ -74,6 +74,11 @@
 
 - What happens when [boundary condition]?
 - How does system handle [error scenario]?
+- Does this feature introduce any risk of implying production-grade security?
+- How does the system handle malformed, replayed, truncated, reordered, or
+  unauthenticated UDP datagrams where relevant?
+- What happens when a client session expires, changes real UDP address, or sends
+  traffic before the handshake reaches `ESTABLISHED`?
 
 ## Requirements *(mandatory)*
 
@@ -89,11 +94,15 @@
 - **FR-003**: Users MUST be able to [key interaction, e.g., "reset their password"]
 - **FR-004**: System MUST [data requirement, e.g., "persist user preferences"]
 - **FR-005**: System MUST [behavior, e.g., "log all security events"]
+- **FR-006**: System MUST state whether the feature changes handshake, crypto,
+  session management, UDP transport, TUN handling, packet parsing, or config.
+- **FR-007**: System MUST preserve the Linux TUN, UDP, star-topology, and
+  learning-only custom-crypto constraints unless the constitution is amended.
 
 *Example of marking unclear requirements:*
 
-- **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
-- **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
+- **FR-008**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
+- **FR-009**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
 
 ### Key Entities *(include if feature involves data)*
 
