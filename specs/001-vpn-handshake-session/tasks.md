@@ -17,10 +17,10 @@
 
 **Purpose**: Create the C project skeleton and test entry points used by all later tasks.
 
-- [ ] T001 Create project directories in include/vpn/, src/, tests/unit/, and tests/integration/
-- [ ] T002 Create C11 build targets for vpn_handshake_tests in Makefile
-- [ ] T003 [P] Add shared test assertion helpers in tests/test_helpers.h
-- [ ] T004 [P] Add feature protocol documentation reference in docs/handshake-session.md
+- [x] T001 Create project directories in include/vpn/, src/, tests/unit/, and tests/integration/
+- [x] T002 Create C11 build targets for vpn_handshake_tests in Makefile
+- [x] T003 [P] Add shared test assertion helpers in tests/test_helpers.h
+- [x] T004 [P] Add feature protocol documentation reference in docs/handshake-session.md
 
 ---
 
