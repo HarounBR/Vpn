@@ -30,16 +30,16 @@
 
 **CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T005 Define protocol constants, message type enum, rejection code enum, and envelope struct in include/vpn/protocol.h
-- [ ] T006 Define handshake state enums, retry policy struct, and handshake context structs in include/vpn/handshake.h
-- [ ] T007 Define client identity, peer address, session, virtual IP assignment, and session table structs in include/vpn/session.h
-- [ ] T008 Create protocol module stub and validation entry points in src/protocol.c
-- [ ] T009 Create handshake module stub and state transition entry points in src/handshake.c
-- [ ] T010 Create session module stub and session table entry points in src/session.c
-- [ ] T011 [P] Add protocol parser unit test skeleton in tests/unit/test_protocol_parse.c
-- [ ] T012 [P] Add handshake state unit test skeleton in tests/unit/test_handshake_state.c
-- [ ] T013 [P] Add session table unit test skeleton in tests/unit/test_session_table.c
-- [ ] T014 [P] Add simulated handshake integration test skeleton in tests/integration/test_handshake_flow.c
+- [x] T005 Define protocol constants, message type enum, rejection code enum, and envelope struct in include/vpn/protocol.h
+- [x] T006 Define handshake state enums, retry policy struct, and handshake context structs in include/vpn/handshake.h
+- [x] T007 Define client identity, peer address, session, virtual IP assignment, and session table structs in include/vpn/session.h
+- [x] T008 Create protocol module stub and validation entry points in src/protocol.c
+- [x] T009 Create handshake module stub and state transition entry points in src/handshake.c
+- [x] T010 Create session module stub and session table entry points in src/session.c
+- [x] T011 [P] Add protocol parser unit test skeleton in tests/unit/test_protocol_parse.c
+- [x] T012 [P] Add handshake state unit test skeleton in tests/unit/test_handshake_state.c
+- [x] T013 [P] Add session table unit test skeleton in tests/unit/test_session_table.c
+- [x] T014 [P] Add simulated handshake integration test skeleton in tests/integration/test_handshake_flow.c
 
 **Checkpoint**: Shared headers, source stubs, and test skeletons compile.
 
