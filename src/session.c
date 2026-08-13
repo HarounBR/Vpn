@@ -182,3 +182,64 @@ int vpn_session_table_record_peer_address(struct vpn_session_table *table, uint6
 
     return -1;
 }
+
+/* T027: Pre-establishment data rejection helper */
+int vpn_session_can_accept_data(const struct vpn_session *session)
+{
+    if (!session) {
+        return 0;
+    }
+
+    return session->state == VPN_SESSION_STATE_ESTABLISHED;
+}
+
+/* T026: Session creation and session ID allocation */
+uint64_t vpn_session_table_next_session_id(struct vpn_session_table *table)
+{
+    if (!table) {
+        return 1;
+    }
+
+    uint64_t max_id = 0;
+    for (size_t i = 0; i < table->session_count; ++i) {
+        if (table->sessions[i].session_id > max_id) {
+            max_id = table->sessions[i].session_id;
+        }
+    }
+
+    return max_id + 1;
+}
+
+int vpn_session_table_create(struct vpn_session_table *table, uint64_t *out_session_id,
+                             const uint8_t *client_id, uint8_t client_id_length,
+                             uint32_t requested_virtual_ip)
+{
+    struct vpn_session session;
+    uint64_t new_session_id;
+
+    if (!table || !out_session_id || !client_id) {
+        return -1;
+    }
+
+    if (client_id_length == 0 || client_id_length > VPN_PROTOCOL_MAX_CLIENT_ID) {
+        return -1;
+    }
+
+    new_session_id = vpn_session_table_next_session_id(table);
+    if (new_session_id == 0) {
+        return -1;
+    }
+
+    memset(&session, 0, sizeof(session));
+    session.session_id = new_session_id;
+    session.state = VPN_SESSION_STATE_HANDSHAKE_IN_PROGRESS;
+    session.client_identity.client_id_length = client_id_length;
+    memcpy(session.client_identity.client_id, client_id, client_id_length);
+
+    if (vpn_session_table_insert(table, &session) != 0) {
+        return -1;
+    }
+
+    *out_session_id = new_session_id;
+    return 0;
+}

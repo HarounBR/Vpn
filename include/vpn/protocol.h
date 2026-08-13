@@ -59,9 +59,60 @@ enum vpn_protocol_result {
     VPN_PROTOCOL_ERR_INSUFFICIENT_LENGTH = -5
 };
 
+/* Payload structures for handshake messages */
+
+struct vpn_protocol_client_hello {
+    uint8_t client_id_length;
+    uint8_t client_id[VPN_PROTOCOL_MAX_CLIENT_ID];
+    uint32_t requested_virtual_ip;
+    uint32_t client_nonce;
+    uint16_t key_exchange_length;
+    uint8_t key_exchange_bytes[256];
+};
+
+struct vpn_protocol_server_hello {
+    uint64_t session_id;
+    uint32_t assigned_virtual_ip;
+    uint32_t server_nonce;
+    uint8_t retry_policy_id;
+    uint32_t lifetime_hint_ms;
+    uint16_t key_exchange_length;
+    uint8_t key_exchange_bytes[256];
+};
+
+struct vpn_protocol_client_finish {
+    uint64_t session_id;
+    uint16_t key_exchange_length;
+    uint8_t key_exchange_bytes[256];
+};
+
+struct vpn_protocol_server_finish {
+    uint64_t session_id;
+    uint16_t key_exchange_length;
+    uint8_t key_exchange_bytes[256];
+};
+
+/* Envelope encode/decode */
 size_t vpn_protocol_envelope_size(void);
 int vpn_protocol_parse_envelope(const uint8_t *data, size_t length, struct vpn_protocol_envelope *out);
+int vpn_protocol_encode_envelope(uint8_t *data, size_t length, const struct vpn_protocol_envelope *envelope);
 int vpn_protocol_validate_envelope(const struct vpn_protocol_envelope *envelope);
+
+/* CLIENT_HELLO encode/decode */
+int vpn_protocol_parse_client_hello(const uint8_t *data, size_t length, struct vpn_protocol_client_hello *out);
+int vpn_protocol_encode_client_hello(uint8_t *data, size_t length, const struct vpn_protocol_client_hello *hello);
+
+/* SERVER_HELLO encode/decode */
+int vpn_protocol_parse_server_hello(const uint8_t *data, size_t length, struct vpn_protocol_server_hello *out);
+int vpn_protocol_encode_server_hello(uint8_t *data, size_t length, const struct vpn_protocol_server_hello *hello);
+
+/* CLIENT_FINISH encode/decode */
+int vpn_protocol_parse_client_finish(const uint8_t *data, size_t length, struct vpn_protocol_client_finish *out);
+int vpn_protocol_encode_client_finish(uint8_t *data, size_t length, const struct vpn_protocol_client_finish *finish);
+
+/* SERVER_FINISH encode/decode */
+int vpn_protocol_parse_server_finish(const uint8_t *data, size_t length, struct vpn_protocol_server_finish *out);
+int vpn_protocol_encode_server_finish(uint8_t *data, size_t length, const struct vpn_protocol_server_finish *finish);
 
 #ifdef __cplusplus
 }

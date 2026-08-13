@@ -65,6 +65,15 @@ int vpn_session_table_remove(struct vpn_session_table *table, uint64_t session_i
 struct vpn_session *vpn_session_table_find_by_virtual_ip(struct vpn_session_table *table, uint32_t virtual_ip);
 int vpn_session_table_record_peer_address(struct vpn_session_table *table, uint64_t session_id, uint32_t address, uint16_t port);
 
+/* T026: Session creation and session ID allocation */
+uint64_t vpn_session_table_next_session_id(struct vpn_session_table *table);
+int vpn_session_table_create(struct vpn_session_table *table, uint64_t *out_session_id, 
+                             const uint8_t *client_id, uint8_t client_id_length,
+                             uint32_t requested_virtual_ip);
+
+/* T027: Pre-establishment data rejection helper */
+int vpn_session_can_accept_data(const struct vpn_session *session);
+
 #ifdef __cplusplus
 }
 #endif

@@ -90,12 +90,231 @@ static void test_handshake_rejects_invalid_state_order(void)
     assert(vpn_handshake_process_envelope(&envelope, &ctx) == -1);
 }
 
+/* T017: Client state path tests - IDLE -> HELLO_SENT -> FINISH_SENT -> ESTABLISHED */
+
+static void test_client_state_idle_sends_hello(void)
+{
+    struct vpn_handshake_context ctx;
+    struct vpn_protocol_envelope envelope;
+    
+    vpn_handshake_context_init(&ctx, 1);
+    assert(ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_IDLE);
+    
+    /* Client sends CLIENT_HELLO */
+    envelope.magic = VPN_PROTOCOL_MAGIC;
+    envelope.version = VPN_PROTOCOL_VERSION;
+    envelope.type = VPN_MSG_CLIENT_HELLO;
+    envelope.flags = 0;
+    envelope.message_id = 1;
+    envelope.session_id = 0;  /* Initial hello has zero session */
+    envelope.payload_length = 0;
+    
+    assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
+    assert(ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_HELLO_SENT);
+}
+
+static void test_client_state_hello_sent_receives_server_hello(void)
+{
+    struct vpn_handshake_context ctx;
+    struct vpn_protocol_envelope envelope;
+    
+    vpn_handshake_context_init(&ctx, 7);
+    
+    /* Move to HELLO_SENT */
+    envelope.magic = VPN_PROTOCOL_MAGIC;
+    envelope.version = VPN_PROTOCOL_VERSION;
+    envelope.type = VPN_MSG_CLIENT_HELLO;
+    envelope.flags = 0;
+    envelope.message_id = 1;
+    envelope.session_id = 0;
+    envelope.payload_length = 0;
+    assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
+    assert(ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_HELLO_SENT);
+    
+    /* Receive SERVER_HELLO with assigned session */
+    envelope.type = VPN_MSG_SERVER_HELLO;
+    envelope.session_id = 7u;
+    envelope.message_id = 2;
+    assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
+    assert(ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_FINISH_SENT);
+}
+
+static void test_client_state_finish_sent_receives_server_finish(void)
+{
+    struct vpn_handshake_context ctx;
+    struct vpn_protocol_envelope envelope;
+    
+    vpn_handshake_context_init(&ctx, 7);
+    
+    /* Move to HELLO_SENT then FINISH_SENT */
+    envelope.magic = VPN_PROTOCOL_MAGIC;
+    envelope.version = VPN_PROTOCOL_VERSION;
+    envelope.type = VPN_MSG_CLIENT_HELLO;
+    envelope.flags = 0;
+    envelope.message_id = 1;
+    envelope.session_id = 0;
+    envelope.payload_length = 0;
+    assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
+    
+    envelope.type = VPN_MSG_SERVER_HELLO;
+    envelope.session_id = 7u;
+    envelope.message_id = 2;
+    assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
+    assert(ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_FINISH_SENT);
+    
+    /* Receive SERVER_FINISH to complete establishment */
+    envelope.type = VPN_MSG_SERVER_FINISH;
+    envelope.session_id = 7u;
+    envelope.message_id = 3;
+    assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
+    assert(ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_ESTABLISHED);
+}
+
+static void test_client_rejects_out_of_order_messages(void)
+{
+    struct vpn_handshake_context ctx;
+    struct vpn_protocol_envelope envelope;
+    
+    vpn_handshake_context_init(&ctx, 7);
+    
+    /* Try to receive SERVER_HELLO before sending CLIENT_HELLO */
+    envelope.magic = VPN_PROTOCOL_MAGIC;
+    envelope.version = VPN_PROTOCOL_VERSION;
+    envelope.type = VPN_MSG_SERVER_HELLO;
+    envelope.flags = 0;
+    envelope.message_id = 1;
+    envelope.session_id = 7u;
+    envelope.payload_length = 0;
+    
+    assert(vpn_handshake_process_envelope(&envelope, &ctx) == -1);
+    assert(ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_IDLE);
+}
+
+/* T018: Server state path tests - NO_SESSION -> HELLO_RECEIVED -> SERVER_HELLO_SENT -> ESTABLISHED */
+
+static void test_server_state_no_session_receives_hello(void)
+{
+    struct vpn_handshake_context ctx;
+    struct vpn_protocol_envelope envelope;
+    
+    vpn_handshake_context_init(&ctx, 0);  /* Initial no session */
+    assert(ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_NO_SESSION);
+    
+    /* Server receives CLIENT_HELLO */
+    envelope.magic = VPN_PROTOCOL_MAGIC;
+    envelope.version = VPN_PROTOCOL_VERSION;
+    envelope.type = VPN_MSG_CLIENT_HELLO;
+    envelope.flags = 0;
+    envelope.message_id = 1;
+    envelope.session_id = 0;
+    envelope.payload_length = 0;
+    
+    assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
+    assert(ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_HELLO_RECEIVED);
+}
+
+static void test_server_state_hello_received_sends_server_hello(void)
+{
+    struct vpn_handshake_context ctx;
+    struct vpn_protocol_envelope envelope;
+    
+    vpn_handshake_context_init(&ctx, 42);  /* Server will assign this session */
+    
+    /* Server receives CLIENT_HELLO */
+    envelope.magic = VPN_PROTOCOL_MAGIC;
+    envelope.version = VPN_PROTOCOL_VERSION;
+    envelope.type = VPN_MSG_CLIENT_HELLO;
+    envelope.flags = 0;
+    envelope.message_id = 1;
+    envelope.session_id = 0;
+    envelope.payload_length = 0;
+    
+    assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
+    assert(ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_HELLO_RECEIVED);
+    
+    /* Server sends SERVER_HELLO with assigned session */
+    envelope.type = VPN_MSG_SERVER_HELLO;
+    envelope.session_id = 42u;
+    envelope.message_id = 2;
+    assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
+    assert(ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_SERVER_HELLO_SENT);
+}
+
+static void test_server_state_server_hello_sent_receives_client_finish(void)
+{
+    struct vpn_handshake_context ctx;
+    struct vpn_protocol_envelope envelope;
+    
+    vpn_handshake_context_init(&ctx, 42);
+    
+    /* Move to SERVER_HELLO_SENT */
+    envelope.magic = VPN_PROTOCOL_MAGIC;
+    envelope.version = VPN_PROTOCOL_VERSION;
+    envelope.type = VPN_MSG_CLIENT_HELLO;
+    envelope.flags = 0;
+    envelope.message_id = 1;
+    envelope.session_id = 0;
+    envelope.payload_length = 0;
+    assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
+    
+    envelope.type = VPN_MSG_SERVER_HELLO;
+    envelope.session_id = 42u;
+    envelope.message_id = 2;
+    assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
+    assert(ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_SERVER_HELLO_SENT);
+    
+    /* Receive CLIENT_FINISH to complete */
+    envelope.type = VPN_MSG_CLIENT_FINISH;
+    envelope.session_id = 42u;
+    envelope.message_id = 3;
+    assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
+    assert(ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_ESTABLISHED);
+}
+
+static void test_server_rejects_invalid_session_id(void)
+{
+    struct vpn_handshake_context ctx;
+    struct vpn_protocol_envelope envelope;
+    
+    vpn_handshake_context_init(&ctx, 42);
+    
+    /* Server receives CLIENT_HELLO */
+    envelope.magic = VPN_PROTOCOL_MAGIC;
+    envelope.version = VPN_PROTOCOL_VERSION;
+    envelope.type = VPN_MSG_CLIENT_HELLO;
+    envelope.flags = 0;
+    envelope.message_id = 1;
+    envelope.session_id = 0;
+    envelope.payload_length = 0;
+    assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
+    
+    /* Send SERVER_HELLO with correct session */
+    envelope.type = VPN_MSG_SERVER_HELLO;
+    envelope.session_id = 42u;
+    envelope.message_id = 2;
+    assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
+    
+    /* Try to receive CLIENT_FINISH for wrong session */
+    envelope.type = VPN_MSG_CLIENT_FINISH;
+    envelope.session_id = 99u;  /* Wrong session ID */
+    envelope.message_id = 3;
+    assert(vpn_handshake_process_envelope(&envelope, &ctx) == -1);
+}
+
 int test_handshake_state(void)
 {
     test_handshake_context_initial_state();
     test_handshake_processes_valid_envelope_transitions();
     test_handshake_rejects_invalid_message();
     test_handshake_rejects_invalid_state_order();
+    test_client_state_idle_sends_hello();
+    test_client_state_hello_sent_receives_server_hello();
+    test_client_state_finish_sent_receives_server_finish();
+    test_client_rejects_out_of_order_messages();
+    test_server_state_no_session_receives_hello();
+    test_server_state_hello_received_sends_server_hello();
+    test_server_state_server_hello_sent_receives_client_finish();
+    test_server_rejects_invalid_session_id();
     printf("test_handshake_state.c passed\n");
     return 0;
 }
