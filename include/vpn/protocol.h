@@ -12,6 +12,7 @@ extern "C" {
 #define VPN_PROTOCOL_VERSION 1u
 #define VPN_PROTOCOL_MAX_CLIENT_ID 64u
 #define VPN_PROTOCOL_MAX_PAYLOAD_LENGTH 65535u
+#define VPN_PROTOCOL_ENVELOPE_SIZE 22u
 
 enum vpn_message_type {
     VPN_MSG_CLIENT_HELLO = 1,
@@ -44,6 +45,10 @@ struct vpn_protocol_envelope {
     uint64_t session_id;
     uint16_t payload_length;
 };
+
+/* The wire format uses a fixed 22-byte header in network byte order.
+ * Do not use sizeof(struct vpn_protocol_envelope) for the on-wire header size.
+ */
 
 enum vpn_protocol_result {
     VPN_PROTOCOL_OK = 0,

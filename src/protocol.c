@@ -4,7 +4,7 @@
 
 size_t vpn_protocol_envelope_size(void)
 {
-    return sizeof(struct vpn_protocol_envelope);
+    return VPN_PROTOCOL_ENVELOPE_SIZE;
 }
 
 static uint32_t vpn_protocol_read_u32(const uint8_t *data)

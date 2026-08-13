@@ -41,8 +41,14 @@ struct vpn_session {
     enum vpn_session_state state;
     uint32_t assigned_virtual_ip;
     struct vpn_peer_address peer_address;
+    uint32_t client_nonce;
+    uint32_t server_nonce;
+    uint8_t key_exchange_context[32];
+    uint8_t key_exchange_context_length;
+    uint64_t last_message_id;
     uint64_t last_seen_at_ms;
     uint64_t expires_at_ms;
+    uint32_t retry_count;
 };
 
 #define VPN_SESSION_TABLE_MAX_SESSIONS 64u
@@ -57,6 +63,7 @@ struct vpn_session *vpn_session_table_find_by_id(struct vpn_session_table *table
 int vpn_session_table_insert(struct vpn_session_table *table, const struct vpn_session *session);
 int vpn_session_table_remove(struct vpn_session_table *table, uint64_t session_id);
 struct vpn_session *vpn_session_table_find_by_virtual_ip(struct vpn_session_table *table, uint32_t virtual_ip);
+int vpn_session_table_record_peer_address(struct vpn_session_table *table, uint64_t session_id, uint32_t address, uint16_t port);
 
 #ifdef __cplusplus
 }

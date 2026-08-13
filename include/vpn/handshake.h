@@ -43,6 +43,13 @@ struct vpn_handshake_context {
     uint32_t retry_count;
     uint64_t last_message_id;
     uint64_t expires_at_ms;
+    uint32_t client_nonce;
+    uint32_t server_nonce;
+    uint8_t key_exchange_context[32];
+    uint8_t key_exchange_context_length;
+    uint32_t handshake_timeout_ms;
+    uint32_t keepalive_interval_ms;
+    uint32_t session_idle_timeout_ms;
 };
 
 void vpn_handshake_context_init(struct vpn_handshake_context *ctx, uint64_t session_id);
