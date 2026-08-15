@@ -53,23 +53,23 @@
 
 ### Tests for User Story 1
 
-- [ ] T015 [P] [US1] Add unit tests for valid and malformed common envelope parsing in tests/unit/test_protocol_parse.c
-- [ ] T016 [P] [US1] Add unit tests for CLIENT_HELLO and SERVER_HELLO payload validation in tests/unit/test_protocol_parse.c
-- [ ] T017 [P] [US1] Add unit tests for client state path IDLE to HELLO_SENT to FINISH_SENT to ESTABLISHED in tests/unit/test_handshake_state.c
-- [ ] T018 [P] [US1] Add unit tests for server state path NO_SESSION to HELLO_RECEIVED to SERVER_HELLO_SENT to ESTABLISHED in tests/unit/test_handshake_state.c
-- [ ] T019 [P] [US1] Add integration test for clean four-message establishment in tests/integration/test_handshake_flow.c
-- [ ] T020 [P] [US1] Add integration test that data-plane traffic is rejected before SERVER_FINISH in tests/integration/test_handshake_flow.c
+- [x] T015 [P] [US1] Add unit tests for valid and malformed common envelope parsing in tests/unit/test_protocol_parse.c
+- [x] T016 [P] [US1] Add unit tests for CLIENT_HELLO and SERVER_HELLO payload validation in tests/unit/test_protocol_parse.c
+- [x] T017 [P] [US1] Add unit tests for client state path IDLE to HELLO_SENT to FINISH_SENT to ESTABLISHED in tests/unit/test_handshake_state.c
+- [x] T018 [P] [US1] Add unit tests for server state path NO_SESSION to HELLO_RECEIVED to SERVER_HELLO_SENT to ESTABLISHED in tests/unit/test_handshake_state.c
+- [x] T019 [P] [US1] Add integration test for clean four-message establishment in tests/integration/test_handshake_flow.c
+- [x] T020 [P] [US1] Add integration test that data-plane traffic is rejected before SERVER_FINISH in tests/integration/test_handshake_flow.c
 
 ### Implementation for User Story 1
 
-- [ ] T021 [US1] Implement common envelope encode/decode and length validation in src/protocol.c
-- [ ] T022 [US1] Implement CLIENT_HELLO and SERVER_HELLO payload encode/decode in src/protocol.c
-- [ ] T023 [US1] Implement CLIENT_FINISH and SERVER_FINISH payload encode/decode in src/protocol.c
-- [ ] T024 [US1] Implement client handshake state transitions for establishment in src/handshake.c
-- [ ] T025 [US1] Implement server handshake state transitions for establishment in src/handshake.c
-- [ ] T026 [US1] Implement session creation and server-assigned session_id allocation in src/session.c
-- [ ] T027 [US1] Implement pre-establishment data-plane rejection helper in src/session.c
-- [ ] T028 [US1] Wire clean establishment simulation helpers in tests/integration/test_handshake_flow.c
+- [x] T021 [US1] Implement common envelope encode/decode and length validation in src/protocol.c
+- [x] T022 [US1] Implement CLIENT_HELLO and SERVER_HELLO payload encode/decode in src/protocol.c
+- [x] T023 [US1] Implement CLIENT_FINISH and SERVER_FINISH payload encode/decode in src/protocol.c
+- [x] T024 [US1] Implement client handshake state transitions for establishment in src/handshake.c
+- [x] T025 [US1] Implement server handshake state transitions for establishment in src/handshake.c
+- [x] T026 [US1] Implement session creation and server-assigned session_id allocation in src/session.c
+- [x] T027 [US1] Implement pre-establishment data-plane rejection helper in src/session.c
+- [x] T028 [US1] Wire clean establishment simulation helpers in tests/integration/test_handshake_flow.c
 
 **Checkpoint**: User Story 1 works independently; a single simulated client establishes a session and early data traffic is rejected.
 

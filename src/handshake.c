@@ -88,27 +88,25 @@ int vpn_handshake_process_envelope(const struct vpn_protocol_envelope *envelope,
                                       VPN_CLIENT_HANDSHAKE_STATE_FINISH_SENT,
                                       VPN_SERVER_HANDSHAKE_STATE_SERVER_HELLO_SENT);
     case VPN_MSG_CLIENT_FINISH:
-        if (envelope->session_id != 0u && envelope->session_id != ctx->session_id) {
+        if (envelope->session_id == 0u || envelope->session_id != ctx->session_id) {
             return -1;
         }
-        if (ctx->client_state != VPN_CLIENT_HANDSHAKE_STATE_FINISH_SENT ||
-            ctx->server_state != VPN_SERVER_HANDSHAKE_STATE_SERVER_HELLO_SENT) {
+        if (ctx->server_state != VPN_SERVER_HANDSHAKE_STATE_SERVER_HELLO_SENT) {
             return -1;
         }
-        return apply_state_transition(ctx,
-                                      VPN_CLIENT_HANDSHAKE_STATE_ESTABLISHED,
-                                      VPN_SERVER_HANDSHAKE_STATE_ESTABLISHED);
+        /* Server moves to ESTABLISHED on CLIENT_FINISH; client stays in FINISH_SENT */
+        ctx->server_state = VPN_SERVER_HANDSHAKE_STATE_ESTABLISHED;
+        return 0;
     case VPN_MSG_SERVER_FINISH:
-        if (envelope->session_id != 0u && envelope->session_id != ctx->session_id) {
+        if (envelope->session_id == 0u || envelope->session_id != ctx->session_id) {
             return -1;
         }
-        if (ctx->client_state != VPN_CLIENT_HANDSHAKE_STATE_FINISH_SENT ||
-            ctx->server_state != VPN_SERVER_HANDSHAKE_STATE_SERVER_HELLO_SENT) {
+        if (ctx->client_state != VPN_CLIENT_HANDSHAKE_STATE_FINISH_SENT) {
             return -1;
         }
-        return apply_state_transition(ctx,
-                                      VPN_CLIENT_HANDSHAKE_STATE_ESTABLISHED,
-                                      VPN_SERVER_HANDSHAKE_STATE_ESTABLISHED);
+        /* Client moves to ESTABLISHED on SERVER_FINISH; server already established */
+        ctx->client_state = VPN_CLIENT_HANDSHAKE_STATE_ESTABLISHED;
+        return 0;
     case VPN_MSG_KEEPALIVE:
     case VPN_MSG_KEEPALIVE_ACK:
     case VPN_MSG_CLOSE:

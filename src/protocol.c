@@ -146,6 +146,10 @@ int vpn_protocol_encode_client_hello(uint8_t *data, size_t length, const struct 
         return VPN_PROTOCOL_ERR_MALFORMED;
     }
 
+    if (hello->key_exchange_length > sizeof(hello->key_exchange_bytes)) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
     size_t required_length = 1 + hello->client_id_length + 4 + 4 + 2 + hello->key_exchange_length;
     if (length < required_length) {
         return VPN_PROTOCOL_ERR_INSUFFICIENT_LENGTH;
@@ -207,6 +211,10 @@ int vpn_protocol_parse_client_hello(const uint8_t *data, size_t length, struct v
         return VPN_PROTOCOL_ERR_INSUFFICIENT_LENGTH;
     }
 
+    if (out->key_exchange_length > sizeof(out->key_exchange_bytes)) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
     memcpy(out->key_exchange_bytes, data + offset, out->key_exchange_length);
     offset += out->key_exchange_length;
 
@@ -221,6 +229,10 @@ int vpn_protocol_encode_server_hello(uint8_t *data, size_t length, const struct 
     }
 
     if (hello->session_id == 0) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
+    if (hello->key_exchange_length > sizeof(hello->key_exchange_bytes)) {
         return VPN_PROTOCOL_ERR_MALFORMED;
     }
 
@@ -288,6 +300,10 @@ int vpn_protocol_parse_server_hello(const uint8_t *data, size_t length, struct v
         return VPN_PROTOCOL_ERR_INSUFFICIENT_LENGTH;
     }
 
+    if (out->key_exchange_length > sizeof(out->key_exchange_bytes)) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
     memcpy(out->key_exchange_bytes, data + offset, out->key_exchange_length);
     offset += out->key_exchange_length;
 
@@ -298,6 +314,14 @@ int vpn_protocol_parse_server_hello(const uint8_t *data, size_t length, struct v
 int vpn_protocol_encode_client_finish(uint8_t *data, size_t length, const struct vpn_protocol_client_finish *finish)
 {
     if (!data || !finish) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
+    if (finish->session_id == 0) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
+    if (finish->key_exchange_length > sizeof(finish->key_exchange_bytes)) {
         return VPN_PROTOCOL_ERR_MALFORMED;
     }
 
@@ -339,6 +363,10 @@ int vpn_protocol_parse_client_finish(const uint8_t *data, size_t length, struct 
         return VPN_PROTOCOL_ERR_INSUFFICIENT_LENGTH;
     }
 
+    if (out->key_exchange_length > sizeof(out->key_exchange_bytes)) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
     memcpy(out->key_exchange_bytes, data + offset, out->key_exchange_length);
     offset += out->key_exchange_length;
 
@@ -348,6 +376,14 @@ int vpn_protocol_parse_client_finish(const uint8_t *data, size_t length, struct 
 int vpn_protocol_encode_server_finish(uint8_t *data, size_t length, const struct vpn_protocol_server_finish *finish)
 {
     if (!data || !finish) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
+    if (finish->session_id == 0) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
+    if (finish->key_exchange_length > sizeof(finish->key_exchange_bytes)) {
         return VPN_PROTOCOL_ERR_MALFORMED;
     }
 
@@ -387,6 +423,10 @@ int vpn_protocol_parse_server_finish(const uint8_t *data, size_t length, struct 
 
     if (length < offset + out->key_exchange_length) {
         return VPN_PROTOCOL_ERR_INSUFFICIENT_LENGTH;
+    }
+
+    if (out->key_exchange_length > sizeof(out->key_exchange_bytes)) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
     }
 
     memcpy(out->key_exchange_bytes, data + offset, out->key_exchange_length);

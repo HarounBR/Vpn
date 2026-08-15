@@ -235,6 +235,7 @@ int vpn_session_table_create(struct vpn_session_table *table, uint64_t *out_sess
     session.state = VPN_SESSION_STATE_HANDSHAKE_IN_PROGRESS;
     session.client_identity.client_id_length = client_id_length;
     memcpy(session.client_identity.client_id, client_id, client_id_length);
+    session.assigned_virtual_ip = requested_virtual_ip;
 
     if (vpn_session_table_insert(table, &session) != 0) {
         return -1;

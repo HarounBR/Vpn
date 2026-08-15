@@ -39,12 +39,24 @@ static void test_handshake_processes_valid_envelope_transitions(void)
 
     envelope.type = VPN_MSG_SERVER_HELLO;
     envelope.session_id = 7u;
+    envelope.message_id = 2;
     assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
     assert(ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_FINISH_SENT);
     assert(ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_SERVER_HELLO_SENT);
+    
     envelope.type = VPN_MSG_CLIENT_FINISH;
     envelope.session_id = 7u;
+    envelope.message_id = 3;
     assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
+    /* Client stays in FINISH_SENT, server moves to ESTABLISHED */
+    assert(ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_FINISH_SENT);
+    assert(ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_ESTABLISHED);
+    
+    envelope.type = VPN_MSG_SERVER_FINISH;
+    envelope.session_id = 7u;
+    envelope.message_id = 4;
+    assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
+    /* Now client moves to ESTABLISHED */
     assert(ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_ESTABLISHED);
     assert(ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_ESTABLISHED);
 }
@@ -162,10 +174,17 @@ static void test_client_state_finish_sent_receives_server_finish(void)
     assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
     assert(ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_FINISH_SENT);
     
-    /* Receive SERVER_FINISH to complete establishment */
-    envelope.type = VPN_MSG_SERVER_FINISH;
+    /* Receive CLIENT_FINISH - server moves to ESTABLISHED, client stays in FINISH_SENT */
+    envelope.type = VPN_MSG_CLIENT_FINISH;
     envelope.session_id = 7u;
     envelope.message_id = 3;
+    assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
+    assert(ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_FINISH_SENT);
+    
+    /* Receive SERVER_FINISH to complete client establishment */
+    envelope.type = VPN_MSG_SERVER_FINISH;
+    envelope.session_id = 7u;
+    envelope.message_id = 4;
     assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
     assert(ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_ESTABLISHED);
 }
@@ -263,7 +282,7 @@ static void test_server_state_server_hello_sent_receives_client_finish(void)
     assert(vpn_handshake_process_envelope(&envelope, &ctx) == 0);
     assert(ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_SERVER_HELLO_SENT);
     
-    /* Receive CLIENT_FINISH to complete */
+    /* Receive CLIENT_FINISH to complete server establishment */
     envelope.type = VPN_MSG_CLIENT_FINISH;
     envelope.session_id = 42u;
     envelope.message_id = 3;

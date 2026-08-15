@@ -47,12 +47,23 @@ static void test_clean_four_message_establishment(void)
     envelope.session_id = 1u;
     envelope.message_id = 12u;
     assert(vpn_handshake_process_envelope(&envelope, &client_ctx) == 0);
-    assert(client_ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_ESTABLISHED);
+    /* Client still in FINISH_SENT, waiting for SERVER_FINISH */
+    assert(client_ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_FINISH_SENT);
 
-    /* Step 3: Server receives CLIENT_FINISH */
+    /* Step 3: Server receives CLIENT_FINISH and moves to ESTABLISHED */
     assert(vpn_handshake_process_envelope(&envelope, &server_ctx) == 0);
     assert(server_ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_ESTABLISHED);
 
+    /* Step 4: Server sends SERVER_FINISH */
+    envelope.type = VPN_MSG_SERVER_FINISH;
+    envelope.session_id = 1u;
+    envelope.message_id = 13u;
+    
+    /* Server doesn't receive its own SERVER_FINISH; client receives it */
+    assert(vpn_handshake_process_envelope(&envelope, &client_ctx) == 0);
+    /* Now client moves to ESTABLISHED */
+    assert(client_ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_ESTABLISHED);
+    
     /* Verify both sides agreed on session_id */
     assert(client_ctx.session_id == server_ctx.session_id);
     assert(client_ctx.session_id == 1u);
@@ -101,6 +112,7 @@ static void test_realistic_handshake_simulation(void)
     struct vpn_protocol_envelope envelope;
     uint64_t server_assigned_session_id;
     uint8_t client_id[] = "client-1";
+    uint32_t requested_vip = 0xC0A80001u;  /* 192.168.0.1 */
     
     vpn_session_table_init(&table);
     vpn_handshake_context_init(&client_ctx, 0);
@@ -123,12 +135,13 @@ static void test_realistic_handshake_simulation(void)
     /* Step 1b: Server creates session on receiving CLIENT_HELLO */
     assert(vpn_session_table_create(&table, &server_assigned_session_id, 
                                      client_id, sizeof(client_id) - 1, 
-                                     0xC0A80001u) == 0);
+                                     requested_vip) == 0);
     assert(server_assigned_session_id == 1u);
     
     struct vpn_session *server_session = vpn_session_table_find_by_id(&table, server_assigned_session_id);
     assert(server_session != NULL);
     assert(server_session->state == VPN_SESSION_STATE_HANDSHAKE_IN_PROGRESS);
+    assert(server_session->assigned_virtual_ip == requested_vip);
     assert(vpn_session_can_accept_data(server_session) == 0);
     
     /* Initialize server context with the assigned session */
@@ -157,21 +170,32 @@ static void test_realistic_handshake_simulation(void)
     envelope.message_id = 3u;
     
     assert(vpn_handshake_process_envelope(&envelope, &client_ctx) == 0);
-    assert(client_ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_ESTABLISHED);
+    /* Client stays in FINISH_SENT, waiting for SERVER_FINISH */
+    assert(client_ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_FINISH_SENT);
     
     /* Server receives CLIENT_FINISH */
     assert(vpn_handshake_process_envelope(&envelope, &server_ctx) == 0);
     assert(server_ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_ESTABLISHED);
     
-    /* Step 4: Mark session as established on server */
+    /* Step 4: Server sends SERVER_FINISH */
+    envelope.type = VPN_MSG_SERVER_FINISH;
+    envelope.session_id = server_assigned_session_id;
+    envelope.message_id = 4u;
+    
+    /* Client receives SERVER_FINISH and moves to ESTABLISHED */
+    assert(vpn_handshake_process_envelope(&envelope, &client_ctx) == 0);
+    assert(client_ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_ESTABLISHED);
+    
+    /* Step 5: Mark session as established on server */
     server_session->state = VPN_SESSION_STATE_ESTABLISHED;
     
-    /* Verify both sides are fully established */
+    /* Verify all expectations */
     assert(client_ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_ESTABLISHED);
     assert(server_ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_ESTABLISHED);
-    assert(vpn_session_can_accept_data(server_session) == 1);
     assert(client_ctx.session_id == server_ctx.session_id);
     assert(client_ctx.session_id == server_assigned_session_id);
+    assert(vpn_session_can_accept_data(server_session) == 1);
+    assert(server_session->assigned_virtual_ip == requested_vip);
 }
 
 int test_handshake_flow(void)

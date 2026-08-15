@@ -133,8 +133,8 @@ static void test_client_hello_valid_payload(void)
     
     hello.client_id_length = 4;
     memcpy(hello.client_id, "test", 4);
-    hello.requested_virtual_ip = htonl(0xC0A80001u);  /* 192.168.0.1 */
-    hello.client_nonce = htonl(12345u);
+    hello.requested_virtual_ip = 0xC0A80001u;  /* 192.168.0.1 in host byte order */
+    hello.client_nonce = 12345u;
     hello.key_exchange_length = 32;
     memset(hello.key_exchange_bytes, 0xBB, 32);
     
@@ -144,7 +144,8 @@ static void test_client_hello_valid_payload(void)
     assert(vpn_protocol_parse_client_hello(buffer, sizeof(buffer), &parsed) > 0);
     assert(parsed.client_id_length == 4);
     assert(memcmp(parsed.client_id, "test", 4) == 0);
-    assert(parsed.client_nonce == htonl(12345u));
+    assert(parsed.client_nonce == 12345u);
+    assert(parsed.requested_virtual_ip == 0xC0A80001u);
 }
 
 static void test_client_hello_rejects_empty_id(void)
@@ -153,8 +154,8 @@ static void test_client_hello_rejects_empty_id(void)
     uint8_t buffer[256] = {0};
     
     hello.client_id_length = 0;  /* Empty client ID */
-    hello.requested_virtual_ip = htonl(0xC0A80001u);
-    hello.client_nonce = htonl(12345u);
+    hello.requested_virtual_ip = 0xC0A80001u;
+    hello.client_nonce = 12345u;
     hello.key_exchange_length = 0;
     
     assert(vpn_protocol_encode_client_hello(buffer, sizeof(buffer), &hello) < 0);
@@ -166,8 +167,8 @@ static void test_client_hello_rejects_oversized_id(void)
     uint8_t buffer[512] = {0};
     
     hello.client_id_length = VPN_PROTOCOL_MAX_CLIENT_ID + 1;  /* Oversized */
-    hello.requested_virtual_ip = htonl(0xC0A80001u);
-    hello.client_nonce = htonl(12345u);
+    hello.requested_virtual_ip = 0xC0A80001u;
+    hello.client_nonce = 12345u;
     hello.key_exchange_length = 0;
     
     assert(vpn_protocol_encode_client_hello(buffer, sizeof(buffer), &hello) < 0);
@@ -179,10 +180,10 @@ static void test_server_hello_valid_payload(void)
     uint8_t buffer[512] = {0};
     
     hello.session_id = 0x0123456789ABCDEFuLL;
-    hello.assigned_virtual_ip = htonl(0xC0A80001u);
-    hello.server_nonce = htonl(54321u);
+    hello.assigned_virtual_ip = 0xC0A80001u;  /* 192.168.0.1 in host byte order */
+    hello.server_nonce = 54321u;
     hello.retry_policy_id = 1;
-    hello.lifetime_hint_ms = htonl(60000u);
+    hello.lifetime_hint_ms = 60000u;
     hello.key_exchange_length = 32;
     memset(hello.key_exchange_bytes, 0xCC, 32);
     
@@ -191,7 +192,7 @@ static void test_server_hello_valid_payload(void)
     struct vpn_protocol_server_hello parsed;
     assert(vpn_protocol_parse_server_hello(buffer, sizeof(buffer), &parsed) > 0);
     assert(parsed.session_id == hello.session_id);
-    assert(parsed.server_nonce == htonl(54321u));
+    assert(parsed.server_nonce == 54321u);
     assert(parsed.retry_policy_id == 1);
 }
 
@@ -201,10 +202,10 @@ static void test_server_hello_rejects_zero_session_id(void)
     uint8_t buffer[512] = {0};
     
     hello.session_id = 0;  /* Invalid: zero session ID */
-    hello.assigned_virtual_ip = htonl(0xC0A80001u);
-    hello.server_nonce = htonl(54321u);
+    hello.assigned_virtual_ip = 0xC0A80001u;
+    hello.server_nonce = 54321u;
     hello.retry_policy_id = 1;
-    hello.lifetime_hint_ms = htonl(60000u);
+    hello.lifetime_hint_ms = 60000u;
     hello.key_exchange_length = 0;
     
     assert(vpn_protocol_encode_server_hello(buffer, sizeof(buffer), &hello) < 0);
