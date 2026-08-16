@@ -83,20 +83,20 @@
 
 ### Tests for User Story 2
 
-- [ ] T029 [P] [US2] Add unit tests for virtual IP assignment uniqueness in tests/unit/test_session_table.c
-- [ ] T030 [P] [US2] Add unit tests for virtual IP lookup returning the owning session in tests/unit/test_session_table.c
-- [ ] T031 [P] [US2] Add unit tests for peer address recording from CLIENT_HELLO in tests/unit/test_session_table.c
-- [ ] T032 [P] [US2] Add integration test for three simultaneous simulated clients in tests/integration/test_handshake_flow.c
-- [ ] T033 [P] [US2] Add integration test for VIRTUAL_IP_CONFLICT rejection without changing the existing session in tests/integration/test_handshake_flow.c
+- [x] T029 [P] [US2] Add unit tests for virtual IP assignment uniqueness in tests/unit/test_session_table.c
+- [x] T030 [P] [US2] Add unit tests for virtual IP lookup returning the owning session in tests/unit/test_session_table.c
+- [x] T031 [P] [US2] Add unit tests for peer address recording from CLIENT_HELLO in tests/unit/test_session_table.c
+- [x] T032 [P] [US2] Add integration test for three simultaneous simulated clients in tests/integration/test_handshake_flow.c
+- [x] T033 [P] [US2] Add integration test for VIRTUAL_IP_CONFLICT rejection without changing the existing session in tests/integration/test_handshake_flow.c
 
 ### Implementation for User Story 2
 
-- [ ] T034 [US2] Implement virtual IP assignment insert, lookup, and release functions in src/session.c
-- [ ] T035 [US2] Implement active virtual IP conflict detection and VIRTUAL_IP_CONFLICT rejection in src/session.c
-- [ ] T036 [US2] Implement peer address capture from CLIENT_HELLO source metadata in src/session.c
-- [ ] T037 [US2] Implement outbound virtual IP to session lookup helper in src/session.c
-- [ ] T038 [US2] Update server handshake flow to reserve virtual IP during SERVER_HELLO in src/handshake.c
-- [ ] T039 [US2] Document virtual IP conflict behavior and peer address mapping in docs/handshake-session.md
+- [x] T034 [US2] Implement virtual IP assignment insert, lookup, and release functions in src/session.c
+- [x] T035 [US2] Implement active virtual IP conflict detection and VIRTUAL_IP_CONFLICT rejection in src/session.c
+- [x] T036 [US2] Implement peer address capture from CLIENT_HELLO source metadata in src/session.c
+- [x] T037 [US2] Implement outbound virtual IP to session lookup helper in src/session.c
+- [x] T038 [US2] Update server handshake flow to reserve virtual IP during SERVER_HELLO in src/handshake.c
+- [x] T039 [US2] Document virtual IP conflict behavior and peer address mapping in docs/handshake-session.md
 
 **Checkpoint**: User Story 2 works independently after US1; multiple simulated clients can be mapped and conflicts are rejected deterministically.
 

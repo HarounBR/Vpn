@@ -69,6 +69,40 @@ NO_SESSION → HELLO_RECEIVED → SERVER_HELLO_SENT → ESTABLISHED
 - Star topology (1 server, N clients)
 - Ops-level NAT (outside application code)
 
+**Virtual IP and Peer Address Rules**
+- Active virtual IP addresses are unique and each lookup resolves to exactly one owning session.
+- A `CLIENT_HELLO` origin is recorded once as the peer address while the session is still in progress, and a second pre-establishment peer change is rejected.
+- After the session is established, the peer address may be rebound when the authenticated flow confirms a new endpoint.
+
+## Session Mapping
+
+### Virtual IP Ownership
+
+- Each established session owns exactly one virtual IP address.
+- A virtual IP of `0` (zero) in a `CLIENT_HELLO` means the client is requesting server-side assignment.
+- Once assigned, the virtual IP is reserved for that session until the session is closed, expired, or explicitly released.
+- The server is authoritative for final virtual IP ownership.
+
+### Conflict Behavior
+
+- Active virtual IP conflicts are rejected deterministically.
+- Conflict detection ignores sessions in `NONE`, `CLOSED`, or `EXPIRED` states.
+- Conflict detection rejects matches against sessions in `HANDSHAKE_IN_PROGRESS`, `ESTABLISHED`, or `CLOSING` states.
+- When a conflict is detected, the existing owner is **not mutated**; the new registration or assignment is rejected.
+- Assignment and conflict functions return explicit result codes (`VPN_SESSION_OK`, `VPN_SESSION_ERR_VIRTUAL_IP_CONFLICT`, etc.) so callers can distinguish rejection reasons.
+
+### Peer Address Capture
+
+- The server records the UDP source address from `CLIENT_HELLO` as the initial peer address while the session is in `HANDSHAKE_IN_PROGRESS`.
+- Peer address capture is allowed only once during the handshake. A second pre-establishment capture attempt for the same session is rejected.
+- After establishment, authenticated keepalive or control traffic may update the peer address in a later phase.
+
+### Outbound Lookup
+
+- Data-plane outbound routing uses `vpn_session_table_lookup_outbound()`.
+- This helper returns only the owner of a virtual IP whose state is `ESTABLISHED`.
+- Lookup returns `NULL` for unknown virtual IPs, or for sessions in `NONE`, `HANDSHAKE_IN_PROGRESS`, `CLOSING`, `CLOSED`, or `EXPIRED` states.
+
 ---
 
 ## Module Ownership
@@ -78,6 +112,8 @@ NO_SESSION → HELLO_RECEIVED → SERVER_HELLO_SENT → ESTABLISHED
 | `protocol.c` | Message parsing, encoding, validation |
 | `handshake.c` | State machine transitions, retry logic, timeout handling |
 | `session.c` | Session table management, virtual IP assignment, lookup, expiration |
+
+Server-side integration code should call `vpn_handshake_reserve_virtual_ip()` before building `SERVER_HELLO` to reserve the assigned virtual IP.
 
 ---
 

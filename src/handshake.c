@@ -1,4 +1,5 @@
 #include "vpn/handshake.h"
+#include "vpn/session.h"
 #include <string.h>
 
 static int apply_state_transition(struct vpn_handshake_context *ctx,
@@ -118,4 +119,12 @@ int vpn_handshake_process_envelope(const struct vpn_protocol_envelope *envelope,
     default:
         return -1;
     }
+}
+
+/* T038: Server-side virtual IP reservation helper */
+int vpn_handshake_reserve_virtual_ip(struct vpn_session_table *table,
+                                     uint64_t session_id,
+                                     uint32_t virtual_ip)
+{
+    return vpn_session_table_assign_virtual_ip(table, session_id, virtual_ip);
 }

@@ -26,6 +26,8 @@ struct vpn_virtual_ip_assignment {
     uint8_t active;
 };
 
+/* Reserved for future explicit assignment table implementation. */
+
 enum vpn_session_state {
     VPN_SESSION_STATE_NONE,
     VPN_SESSION_STATE_HANDSHAKE_IN_PROGRESS,
@@ -33,6 +35,17 @@ enum vpn_session_state {
     VPN_SESSION_STATE_CLOSING,
     VPN_SESSION_STATE_CLOSED,
     VPN_SESSION_STATE_EXPIRED
+};
+
+enum vpn_session_result {
+    VPN_SESSION_OK = 0,
+    VPN_SESSION_ERR_NOT_FOUND = -1,
+    VPN_SESSION_ERR_INVALID_INPUT = -2,
+    VPN_SESSION_ERR_TABLE_FULL = -3,
+    VPN_SESSION_ERR_DUPLICATE_IDENTITY = -4,
+    VPN_SESSION_ERR_VIRTUAL_IP_CONFLICT = -5,
+    VPN_SESSION_ERR_VIRTUAL_IP_NOT_FOUND = -6,
+    VPN_SESSION_ERR_INVALID_STATE = -7
 };
 
 struct vpn_session {
@@ -64,6 +77,29 @@ int vpn_session_table_insert(struct vpn_session_table *table, const struct vpn_s
 int vpn_session_table_remove(struct vpn_session_table *table, uint64_t session_id);
 struct vpn_session *vpn_session_table_find_by_virtual_ip(struct vpn_session_table *table, uint32_t virtual_ip);
 int vpn_session_table_record_peer_address(struct vpn_session_table *table, uint64_t session_id, uint32_t address, uint16_t port);
+
+/* T034: Virtual IP assignment, lookup, and release */
+int vpn_session_table_assign_virtual_ip(struct vpn_session_table *table,
+                                        uint64_t session_id,
+                                        uint32_t virtual_ip);
+int vpn_session_table_release_virtual_ip(struct vpn_session_table *table,
+                                         uint64_t session_id,
+                                         uint32_t virtual_ip);
+
+/* T035: Active virtual IP conflict detection */
+int vpn_session_table_has_virtual_ip_conflict(const struct vpn_session_table *table,
+                                              uint32_t virtual_ip,
+                                              uint64_t allowed_session_id);
+
+/* T036: Peer address capture from CLIENT_HELLO */
+int vpn_session_table_capture_client_hello_peer(struct vpn_session_table *table,
+                                                uint64_t session_id,
+                                                uint32_t address,
+                                                uint16_t port);
+
+/* T037: Outbound virtual IP lookup for data-plane routing */
+struct vpn_session *vpn_session_table_lookup_outbound(struct vpn_session_table *table,
+                                                      uint32_t destination_virtual_ip);
 
 /* T026: Session creation and session ID allocation */
 uint64_t vpn_session_table_next_session_id(struct vpn_session_table *table);

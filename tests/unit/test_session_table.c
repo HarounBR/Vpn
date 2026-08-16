@@ -66,6 +66,120 @@ static void test_session_table_conflicts_and_peer_address(void)
     assert(table.sessions[0].peer_address.port == 1194);
 }
 
+static void test_session_table_virtual_ip_uniqueness(void)
+{
+    struct vpn_session_table table;
+    struct vpn_session session_a;
+    struct vpn_session session_b;
+    struct vpn_session session_c;
+    struct vpn_session *owner;
+    const uint32_t vip_a = 0x0A000001u;
+    const uint32_t vip_b = 0x0A000002u;
+
+    memset(&table, 0, sizeof(table));
+    vpn_session_table_init(&table);
+
+    memset(&session_a, 0, sizeof(session_a));
+    session_a.session_id = 20u;
+    session_a.state = VPN_SESSION_STATE_HANDSHAKE_IN_PROGRESS;
+    session_a.assigned_virtual_ip = vip_a;
+    session_a.client_identity.client_id_length = 5u;
+    memcpy(session_a.client_identity.client_id, "alpha", 5u);
+    assert(vpn_session_table_insert(&table, &session_a) == 0);
+
+    memset(&session_b, 0, sizeof(session_b));
+    session_b.session_id = 21u;
+    session_b.state = VPN_SESSION_STATE_HANDSHAKE_IN_PROGRESS;
+    session_b.assigned_virtual_ip = vip_b;
+    session_b.client_identity.client_id_length = 5u;
+    memcpy(session_b.client_identity.client_id, "bravo", 5u);
+    assert(vpn_session_table_insert(&table, &session_b) == 0);
+
+    memset(&session_c, 0, sizeof(session_c));
+    session_c.session_id = 22u;
+    session_c.state = VPN_SESSION_STATE_HANDSHAKE_IN_PROGRESS;
+    session_c.assigned_virtual_ip = vip_a;
+    session_c.client_identity.client_id_length = 5u;
+    memcpy(session_c.client_identity.client_id, "gamma", 5u);
+    assert(vpn_session_table_insert(&table, &session_c) != 0);
+
+    owner = vpn_session_table_find_by_virtual_ip(&table, vip_a);
+    assert(owner != NULL);
+    assert(owner->session_id == session_a.session_id);
+    assert(table.session_count == 2u);
+}
+
+static void test_session_table_virtual_ip_lookup(void)
+{
+    struct vpn_session_table table;
+    struct vpn_session session_a;
+    struct vpn_session session_b;
+    struct vpn_session session_c;
+    struct vpn_session *found;
+    const uint32_t vip_a = 0x0A000011u;
+    const uint32_t vip_b = 0x0A000012u;
+    const uint32_t vip_c = 0x0A000013u;
+
+    memset(&table, 0, sizeof(table));
+    vpn_session_table_init(&table);
+
+    memset(&session_a, 0, sizeof(session_a));
+    session_a.session_id = 30u;
+    session_a.state = VPN_SESSION_STATE_ESTABLISHED;
+    session_a.assigned_virtual_ip = vip_a;
+    session_a.client_identity.client_id_length = 5u;
+    memcpy(session_a.client_identity.client_id, "alpha", 5u);
+    assert(vpn_session_table_insert(&table, &session_a) == 0);
+
+    memset(&session_b, 0, sizeof(session_b));
+    session_b.session_id = 31u;
+    session_b.state = VPN_SESSION_STATE_ESTABLISHED;
+    session_b.assigned_virtual_ip = vip_b;
+    session_b.client_identity.client_id_length = 5u;
+    memcpy(session_b.client_identity.client_id, "bravo", 5u);
+    assert(vpn_session_table_insert(&table, &session_b) == 0);
+
+    memset(&session_c, 0, sizeof(session_c));
+    session_c.session_id = 32u;
+    session_c.state = VPN_SESSION_STATE_ESTABLISHED;
+    session_c.assigned_virtual_ip = vip_c;
+    session_c.client_identity.client_id_length = 5u;
+    memcpy(session_c.client_identity.client_id, "charl", 5u);
+    assert(vpn_session_table_insert(&table, &session_c) == 0);
+
+    found = vpn_session_table_find_by_virtual_ip(&table, vip_b);
+    assert(found != NULL);
+    assert(found->session_id == session_b.session_id);
+
+    found = vpn_session_table_find_by_virtual_ip(&table, 0x0A0000FFu);
+    assert(found == NULL);
+}
+
+static void test_session_table_records_peer_address_from_client_hello(void)
+{
+    struct vpn_session_table table;
+    struct vpn_session session;
+
+    memset(&table, 0, sizeof(table));
+    vpn_session_table_init(&table);
+
+    memset(&session, 0, sizeof(session));
+    session.session_id = 40u;
+    session.state = VPN_SESSION_STATE_HANDSHAKE_IN_PROGRESS;
+    session.assigned_virtual_ip = 0x0A000021u;
+    session.client_identity.client_id_length = 4u;
+    memcpy(session.client_identity.client_id, "test", 4u);
+    assert(vpn_session_table_insert(&table, &session) == 0);
+
+    assert(vpn_session_table_record_peer_address(&table, session.session_id, 0xC0A8000Au, 1194u) == 0);
+    assert(table.sessions[0].peer_address.address == 0xC0A8000Au);
+    assert(table.sessions[0].peer_address.port == 1194u);
+
+    assert(vpn_session_table_record_peer_address(&table, session.session_id, 0xC0A8000Bu, 1195u) != 0);
+    assert(table.sessions[0].peer_address.address == 0xC0A8000Au);
+    assert(table.sessions[0].peer_address.port == 1194u);
+}
+
 static void test_session_table_rejects_invalid_identity_and_zero_virtual_ip(void)
 {
     struct vpn_session_table table;
@@ -95,6 +209,9 @@ int test_session_table(void)
 {
     test_session_table_init();
     test_session_table_conflicts_and_peer_address();
+    test_session_table_virtual_ip_uniqueness();
+    test_session_table_virtual_ip_lookup();
+    test_session_table_records_peer_address_from_client_hello();
     test_session_table_rejects_invalid_identity_and_zero_virtual_ip();
     printf("test_session_table.c passed\n");
     return 0;

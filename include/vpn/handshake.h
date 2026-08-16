@@ -57,6 +57,13 @@ int vpn_handshake_should_retry(const struct vpn_handshake_context *ctx);
 int vpn_handshake_process_envelope(const struct vpn_protocol_envelope *envelope,
                                   struct vpn_handshake_context *ctx);
 
+/* T038: Server-side virtual IP reservation helper */
+struct vpn_session_table;
+
+int vpn_handshake_reserve_virtual_ip(struct vpn_session_table *table,
+                                     uint64_t session_id,
+                                     uint32_t virtual_ip);
+
 #ifdef __cplusplus
 }
 #endif
