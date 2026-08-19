@@ -45,8 +45,19 @@ enum vpn_session_result {
     VPN_SESSION_ERR_DUPLICATE_IDENTITY = -4,
     VPN_SESSION_ERR_VIRTUAL_IP_CONFLICT = -5,
     VPN_SESSION_ERR_VIRTUAL_IP_NOT_FOUND = -6,
-    VPN_SESSION_ERR_INVALID_STATE = -7
+    VPN_SESSION_ERR_INVALID_STATE = -7,
+    VPN_SESSION_ERR_AUTHENTICATION_FAILED = -8
 };
+
+enum vpn_auth_result {
+    VPN_AUTH_OK = 0,
+    VPN_AUTH_FAILED = -1,
+    VPN_AUTH_STALE = -2,
+    VPN_AUTH_REPLAY = -3
+};
+
+#define VPN_SESSION_IDLE_TIMEOUT_MS 45000u
+#define VPN_HANDSHAKE_TIMEOUT_MS 10000u
 
 struct vpn_session {
     uint64_t session_id;
@@ -60,8 +71,8 @@ struct vpn_session {
     uint8_t key_exchange_context_length;
     uint64_t last_message_id;
     uint64_t last_seen_at_ms;
-    uint64_t expires_at_ms;
-    uint32_t retry_count;
+    uint64_t handshake_deadline_ms;
+    uint64_t pending_keepalive_message_id;
 };
 
 #define VPN_SESSION_TABLE_MAX_SESSIONS 64u
@@ -76,7 +87,6 @@ struct vpn_session *vpn_session_table_find_by_id(struct vpn_session_table *table
 int vpn_session_table_insert(struct vpn_session_table *table, const struct vpn_session *session);
 int vpn_session_table_remove(struct vpn_session_table *table, uint64_t session_id);
 struct vpn_session *vpn_session_table_find_by_virtual_ip(struct vpn_session_table *table, uint32_t virtual_ip);
-int vpn_session_table_record_peer_address(struct vpn_session_table *table, uint64_t session_id, uint32_t address, uint16_t port);
 
 /* T034: Virtual IP assignment, lookup, and release */
 int vpn_session_table_assign_virtual_ip(struct vpn_session_table *table,
@@ -109,6 +119,28 @@ int vpn_session_table_create(struct vpn_session_table *table, uint64_t *out_sess
 
 /* T027: Pre-establishment data rejection helper */
 int vpn_session_can_accept_data(const struct vpn_session *session);
+
+/* T048: Session expiration and cleanup */
+int vpn_session_table_check_expiration(struct vpn_session_table *table, uint64_t current_time_ms);
+int vpn_session_table_cleanup_expired(struct vpn_session_table *table, uint64_t current_time_ms);
+int vpn_session_table_cleanup_session(struct vpn_session_table *table, uint64_t session_id);
+
+/* T051: Authenticated peer address rebinding and keepalive processing */
+int vpn_session_table_process_keepalive(struct vpn_session_table *table, uint64_t session_id,
+                                        uint64_t current_time_ms, uint64_t message_id,
+                                        uint32_t peer_address, uint16_t peer_port,
+                                        enum vpn_auth_result auth_result);
+int vpn_session_table_process_keepalive_ack(struct vpn_session_table *table, uint64_t session_id,
+                                            uint64_t current_time_ms, uint64_t original_message_id,
+                                            enum vpn_auth_result auth_result);
+int vpn_session_table_process_close(struct vpn_session_table *table, uint64_t session_id,
+                                    uint64_t current_time_ms, enum vpn_auth_result auth_result);
+int vpn_session_table_process_reject(struct vpn_session_table *table, uint64_t session_id,
+                                     uint64_t failed_message_id, enum vpn_auth_result auth_result);
+
+/* T048: Session establishment with timestamp */
+int vpn_session_table_establish(struct vpn_session_table *table, uint64_t session_id,
+                                uint64_t current_time_ms);
 
 #ifdef __cplusplus
 }

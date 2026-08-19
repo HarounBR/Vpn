@@ -50,7 +50,7 @@ NO_SESSION → HELLO_RECEIVED → SERVER_HELLO_SENT → ESTABLISHED
 
 ### Timing Summary
 - Handshake timeout: **10 seconds**
-- Retry schedule: **1s, 2s, 4s, 4s** (4 retries max)
+- Retry schedule: **0s initial, then 1s, 3s, and 7s** (4 total transmissions)
 - Session idle timeout: **45 seconds**
 - Keepalive interval: **15 seconds** of idleness
 
@@ -95,13 +95,70 @@ NO_SESSION → HELLO_RECEIVED → SERVER_HELLO_SENT → ESTABLISHED
 
 - The server records the UDP source address from `CLIENT_HELLO` as the initial peer address while the session is in `HANDSHAKE_IN_PROGRESS`.
 - Peer address capture is allowed only once during the handshake. A second pre-establishment capture attempt for the same session is rejected.
-- After establishment, authenticated keepalive or control traffic may update the peer address in a later phase.
+- After establishment, **only authenticated `KEEPALIVE` messages may update the peer address** (rebinding). `KEEPALIVE_ACK` only refreshes liveness and does not change the peer address. `vpn_session_table_capture_client_hello_peer()` handles the initial address, and `vpn_session_table_process_keepalive()` is the only established-session rebinding path.
 
 ### Outbound Lookup
 
 - Data-plane outbound routing uses `vpn_session_table_lookup_outbound()`.
 - This helper returns only the owner of a virtual IP whose state is `ESTABLISHED`.
 - Lookup returns `NULL` for unknown virtual IPs, or for sessions in `NONE`, `HANDSHAKE_IN_PROGRESS`, `CLOSING`, `CLOSED`, or `EXPIRED` states.
+
+---
+
+## Retry, Timeout, Keepalive, Expiration, and Rebinding
+
+### Retry Policy
+
+The handshake uses an exponential backoff retry schedule with a maximum of 4 total transmission attempts (1 initial + 3 retries):
+
+| Attempt | Delay | Cumulative |
+|---------|-------|------------|
+| 1 (initial) | 0s | 0s |
+| 2 (retry) | 1s | 1s |
+| 3 (retry) | 2s | 3s |
+| 4 (retry) | 4s | 7s |
+
+After the 4th transmission attempt fails, the handshake transitions to `FAILED` state immediately. The partial session state is cleaned up and any reserved virtual IP is released.
+
+### Handshake Timeout
+
+In-progress handshakes have a hard timeout of **10 seconds** (`handshake_deadline_ms`). This hard deadline is separate from the per-attempt retry deadlines (`next_retry_at_ms`). If the handshake does not complete within this 10-second window, the server immediately marks the handshake as `FAILED`, removes the partial session state, and releases any reserved virtual IP. The hard deadline always wins - no retry is scheduled if it would exceed the 10-second deadline. The timeout is tracked per-handshake via the `handshake_deadline_ms` field in the handshake context.
+
+### Keepalive and Liveness
+
+- Only the client initiates `KEEPALIVE` messages, sent after **15 seconds** without authenticated traffic.
+- The server replies with `KEEPALIVE_ACK` to acknowledge liveness.
+- Valid authenticated keepalive traffic (from either side) refreshes the session's `last_seen_at_ms` timestamp.
+- **Only authenticated `KEEPALIVE` messages may update the peer address** (rebinding). `KEEPALIVE_ACK` only refreshes liveness and does not change the peer address.
+- Keepalive messages carry a timestamp to enable round-trip time estimation and replay detection.
+- Duplicate and stale messages (based on message ID) are silently ignored and do not refresh liveness.
+
+### Session Expiration
+
+Established sessions expire after **45 seconds** of inactivity (no authenticated traffic). When a session expires:
+
+1. The session state transitions to `EXPIRED`.
+2. The virtual IP ownership is released (assigned_virtual_ip set to 0).
+3. The session is removed from the session table.
+4. The peer address mapping is cleared.
+
+The server periodically checks for expired handshakes against `handshake_deadline_ms` and established sessions against `last_seen_at_ms + 45s`.
+
+### Authenticated Peer Address Rebinding
+
+- The initial peer address is captured once from the `CLIENT_HELLO` UDP source during `HANDSHAKE_IN_PROGRESS`.
+- Pre-establishment peer address changes are rejected.
+- After establishment, only authenticated `KEEPALIVE` messages from a new UDP source may update the peer address. `KEEPALIVE_ACK` never changes the peer address.
+- Unauthenticated traffic (e.g., data-plane packets, duplicate handshake messages) from a different source address **must not** change the stored peer address.
+- `vpn_session_table_process_keepalive()` enforces the established-state, authentication, freshness, and valid-source checks.
+
+### Duplicate and Stale Message Handling
+
+- Duplicate control messages (same `message_id` for a given session) are silently ignored.
+- Stale messages (for sessions that have advanced past the expected state) are silently ignored.
+- Out-of-order messages (e.g., `CLIENT_FINISH` before `SERVER_HELLO`) are rejected with `INVALID_STATE`.
+- Replayed messages after session expiration or closure are silently ignored.
+- These rules ensure that message loss, duplication, or reordering cannot create sessions, advance state, refresh liveness, or change peer mappings incorrectly.
 
 ---
 

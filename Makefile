@@ -14,3 +14,5 @@ vpn_handshake_tests: $(OBJS)
 
 test: vpn_handshake_tests
 	./vpn_handshake_tests
+clean:
+	rm -f $(OBJS) vpn_handshake_tests

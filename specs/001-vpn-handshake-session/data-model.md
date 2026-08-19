@@ -48,8 +48,8 @@ Represents one control-plane UDP datagram.
   rejected.
 - Data-plane traffic is not accepted through this model unless the session state
   is `ESTABLISHED`.
-- Duplicate messages may be answered idempotently only when they match the
-  immediately previous valid transition.
+- Duplicate and stale messages are silently ignored and must not create
+  sessions, advance state, refresh liveness, or change peer mappings.
 
 ## Session
 
@@ -70,8 +70,9 @@ begins.
   module.
 - `last_message_id`: last accepted control-message ID for duplicate handling.
 - `last_seen_at`: monotonic timestamp of last authenticated traffic.
-- `retry_count`: retries attempted for the current pending message.
-- `expires_at`: monotonic timestamp for handshake or session expiration.
+- `attempt_count`: total handshake transmissions, including the initial transmission.
+- `handshake_deadline_ms`: fixed monotonic deadline for an in-progress handshake.
+- `next_retry_at_ms`: monotonic deadline for the next retransmission only.
 
 **Validation Rules**:
 
@@ -114,7 +115,10 @@ Represents retry and expiration settings for control-plane behavior.
 
 **Validation Rules**:
 
-- Retry delay doubles after each retry until `max_retry_ms`.
+- The initial transmission is attempt 1; at most three retries follow after
+  1s, 3s, and 7s cumulative delays from handshake start.
+- Retry exhaustion immediately transitions the in-progress session to `FAILED`
+  and releases any reserved virtual IP.
 - In-progress sessions expire after `handshake_timeout_ms`.
 - Established sessions expire after `session_idle_timeout_ms` without
   authenticated traffic.

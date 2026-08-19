@@ -92,6 +92,37 @@ struct vpn_protocol_server_finish {
     uint8_t key_exchange_bytes[256];
 };
 
+/* KEEPALIVE payload */
+struct vpn_protocol_keepalive {
+    uint64_t session_id;
+    uint64_t timestamp_ms;
+    uint8_t authenticator[32];
+    uint8_t authenticator_length;
+};
+
+/* KEEPALIVE_ACK payload */
+struct vpn_protocol_keepalive_ack {
+    uint64_t session_id;
+    uint64_t original_timestamp_ms;
+    uint8_t authenticator[32];
+    uint8_t authenticator_length;
+};
+
+/* CLOSE payload */
+struct vpn_protocol_close {
+    uint64_t session_id;
+    uint8_t reason;
+    uint8_t authenticator[32];
+    uint8_t authenticator_length;
+};
+
+/* REJECT payload */
+struct vpn_protocol_reject {
+    uint64_t session_id;
+    uint8_t rejection_code;
+    uint64_t failed_message_id;
+};
+
 /* Envelope encode/decode */
 size_t vpn_protocol_envelope_size(void);
 int vpn_protocol_parse_envelope(const uint8_t *data, size_t length, struct vpn_protocol_envelope *out);
@@ -113,6 +144,22 @@ int vpn_protocol_encode_client_finish(uint8_t *data, size_t length, const struct
 /* SERVER_FINISH encode/decode */
 int vpn_protocol_parse_server_finish(const uint8_t *data, size_t length, struct vpn_protocol_server_finish *out);
 int vpn_protocol_encode_server_finish(uint8_t *data, size_t length, const struct vpn_protocol_server_finish *finish);
+
+/* KEEPALIVE encode/decode */
+int vpn_protocol_parse_keepalive(const uint8_t *data, size_t length, struct vpn_protocol_keepalive *out);
+int vpn_protocol_encode_keepalive(uint8_t *data, size_t length, const struct vpn_protocol_keepalive *keepalive);
+
+/* KEEPALIVE_ACK encode/decode */
+int vpn_protocol_parse_keepalive_ack(const uint8_t *data, size_t length, struct vpn_protocol_keepalive_ack *out);
+int vpn_protocol_encode_keepalive_ack(uint8_t *data, size_t length, const struct vpn_protocol_keepalive_ack *ack);
+
+/* CLOSE encode/decode */
+int vpn_protocol_parse_close(const uint8_t *data, size_t length, struct vpn_protocol_close *out);
+int vpn_protocol_encode_close(uint8_t *data, size_t length, const struct vpn_protocol_close *close);
+
+/* REJECT encode/decode */
+int vpn_protocol_parse_reject(const uint8_t *data, size_t length, struct vpn_protocol_reject *out);
+int vpn_protocol_encode_reject(uint8_t *data, size_t length, const struct vpn_protocol_reject *reject);
 
 #ifdef __cplusplus
 }

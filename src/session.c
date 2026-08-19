@@ -159,10 +159,11 @@ struct vpn_session *vpn_session_table_find_by_virtual_ip(struct vpn_session_tabl
     return NULL;
 }
 
-/* Phase 4 boundary: vpn_session_table_capture_client_hello_peer() is the
- * handshake-time peer capture helper. This function is for established-session
- * updates and must not be used for unauthenticated CLIENT_HELLO capture. */
-int vpn_session_table_record_peer_address(struct vpn_session_table *table, uint64_t session_id, uint32_t address, uint16_t port)
+/* T036: Peer address capture from CLIENT_HELLO */
+int vpn_session_table_capture_client_hello_peer(struct vpn_session_table *table,
+                                                uint64_t session_id,
+                                                uint32_t address,
+                                                uint16_t port)
 {
     struct vpn_session *session;
 
@@ -175,19 +176,21 @@ int vpn_session_table_record_peer_address(struct vpn_session_table *table, uint6
         return VPN_SESSION_ERR_NOT_FOUND;
     }
 
-    if (session->state != VPN_SESSION_STATE_ESTABLISHED &&
-        (session->peer_address.address != 0u || session->peer_address.port != 0u)) {
+    if (session->state != VPN_SESSION_STATE_HANDSHAKE_IN_PROGRESS) {
         return VPN_SESSION_ERR_INVALID_STATE;
     }
 
-    if (session->state == VPN_SESSION_STATE_ESTABLISHED ||
-        (session->peer_address.address == 0u && session->peer_address.port == 0u)) {
-        session->peer_address.address = address;
-        session->peer_address.port = port;
-        return VPN_SESSION_OK;
+    if (address == 0u || port == 0u) {
+        return VPN_SESSION_ERR_INVALID_INPUT;
     }
 
-    return VPN_SESSION_ERR_INVALID_STATE;
+    if (session->peer_address.address != 0u || session->peer_address.port != 0u) {
+        return VPN_SESSION_ERR_INVALID_STATE;
+    }
+
+    session->peer_address.address = address;
+    session->peer_address.port = port;
+    return VPN_SESSION_OK;
 }
 
 /* T027: Pre-establishment data rejection helper */
@@ -301,36 +304,6 @@ int vpn_session_table_release_virtual_ip(struct vpn_session_table *table,
     return VPN_SESSION_OK;
 }
 
-/* T036: Peer address capture from CLIENT_HELLO */
-int vpn_session_table_capture_client_hello_peer(struct vpn_session_table *table,
-                                                uint64_t session_id,
-                                                uint32_t address,
-                                                uint16_t port)
-{
-    struct vpn_session *session;
-
-    if (!table) {
-        return -1;
-    }
-
-    session = vpn_session_table_find_by_id(table, session_id);
-    if (!session) {
-        return -1;
-    }
-
-    if (session->state != VPN_SESSION_STATE_HANDSHAKE_IN_PROGRESS) {
-        return -1;
-    }
-
-    if (session->peer_address.address != 0u || session->peer_address.port != 0u) {
-        return -1;
-    }
-
-    session->peer_address.address = address;
-    session->peer_address.port = port;
-    return 0;
-}
-
 /* T037: Outbound virtual IP lookup for data-plane routing */
 struct vpn_session *vpn_session_table_lookup_outbound(struct vpn_session_table *table,
                                                       uint32_t destination_virtual_ip)
@@ -347,4 +320,255 @@ struct vpn_session *vpn_session_table_lookup_outbound(struct vpn_session_table *
     }
 
     return session;
+}
+
+static int session_is_expired(const struct vpn_session *session, uint64_t current_time_ms)
+{
+    if (!session) {
+        return 0;
+    }
+
+    if (session->state == VPN_SESSION_STATE_HANDSHAKE_IN_PROGRESS) {
+        return session->handshake_deadline_ms != 0u &&
+               current_time_ms >= session->handshake_deadline_ms;
+    }
+
+    if (session->state == VPN_SESSION_STATE_ESTABLISHED) {
+        return session->last_seen_at_ms == 0u ||
+               current_time_ms - session->last_seen_at_ms >= VPN_SESSION_IDLE_TIMEOUT_MS;
+    }
+
+    return 0;
+}
+
+int vpn_session_table_check_expiration(struct vpn_session_table *table, uint64_t current_time_ms)
+{
+    if (!table) {
+        return VPN_SESSION_ERR_INVALID_INPUT;
+    }
+
+    for (size_t i = 0; i < table->session_count; ++i) {
+        struct vpn_session *session = &table->sessions[i];
+        if (!session_is_active(session)) {
+            continue;
+        }
+
+        if (session_is_expired(session, current_time_ms)) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+int vpn_session_table_cleanup_expired(struct vpn_session_table *table, uint64_t current_time_ms)
+{
+    if (!table) {
+        return VPN_SESSION_ERR_INVALID_INPUT;
+    }
+
+    int cleaned = 0;
+    size_t i = 0;
+
+    while (i < table->session_count) {
+        struct vpn_session *session = &table->sessions[i];
+        int expired = session_is_active(session) && session_is_expired(session, current_time_ms);
+
+        if (expired) {
+            session->assigned_virtual_ip = 0u;
+            session->peer_address.address = 0u;
+            session->peer_address.port = 0u;
+            session->handshake_deadline_ms = 0u;
+            session->pending_keepalive_message_id = 0u;
+
+            if (i + 1 < table->session_count) {
+                memmove(&table->sessions[i], &table->sessions[i + 1],
+                        (table->session_count - i - 1) * sizeof(table->sessions[0]));
+            }
+            --table->session_count;
+            ++cleaned;
+        } else {
+            ++i;
+        }
+    }
+
+    return cleaned;
+}
+
+/* T051: Authenticated peer address rebinding and keepalive processing */
+int vpn_session_table_process_keepalive(struct vpn_session_table *table, uint64_t session_id,
+                                        uint64_t current_time_ms, uint64_t message_id,
+                                        uint32_t peer_address, uint16_t peer_port,
+                                        enum vpn_auth_result auth_result)
+{
+    struct vpn_session *session;
+
+    if (!table) {
+        return VPN_SESSION_ERR_INVALID_INPUT;
+    }
+
+    session = vpn_session_table_find_by_id(table, session_id);
+    if (!session) {
+        return VPN_SESSION_ERR_NOT_FOUND;
+    }
+
+    if (session->state != VPN_SESSION_STATE_ESTABLISHED) {
+        return VPN_SESSION_ERR_INVALID_STATE;
+    }
+
+    if (message_id == 0u || peer_address == 0u || peer_port == 0u) {
+        return VPN_SESSION_ERR_INVALID_INPUT;
+    }
+
+    if (message_id <= session->last_message_id) {
+        return VPN_SESSION_OK;
+    }
+
+    if (auth_result != VPN_AUTH_OK) {
+        return VPN_SESSION_ERR_AUTHENTICATION_FAILED;
+    }
+
+    session->last_seen_at_ms = current_time_ms;
+
+    if (session->peer_address.address != peer_address || session->peer_address.port != peer_port) {
+        session->peer_address.address = peer_address;
+        session->peer_address.port = peer_port;
+    }
+
+    session->last_message_id = message_id;
+    session->pending_keepalive_message_id = message_id;
+
+    return VPN_SESSION_OK;
+}
+
+int vpn_session_table_process_keepalive_ack(struct vpn_session_table *table, uint64_t session_id,
+                                            uint64_t current_time_ms, uint64_t original_message_id,
+                                            enum vpn_auth_result auth_result)
+{
+    struct vpn_session *session;
+
+    if (!table) {
+        return VPN_SESSION_ERR_INVALID_INPUT;
+    }
+
+    session = vpn_session_table_find_by_id(table, session_id);
+    if (!session) {
+        return VPN_SESSION_ERR_NOT_FOUND;
+    }
+
+    if (session->state != VPN_SESSION_STATE_ESTABLISHED) {
+        return VPN_SESSION_ERR_INVALID_STATE;
+    }
+
+    if (original_message_id == 0u || auth_result != VPN_AUTH_OK) {
+        return VPN_SESSION_ERR_AUTHENTICATION_FAILED;
+    }
+
+    if (session->pending_keepalive_message_id == 0u ||
+        original_message_id != session->pending_keepalive_message_id) {
+        return VPN_SESSION_OK;
+    }
+
+    session->last_seen_at_ms = current_time_ms;
+    session->pending_keepalive_message_id = 0u;
+
+    return VPN_SESSION_OK;
+}
+
+int vpn_session_table_process_close(struct vpn_session_table *table, uint64_t session_id,
+                                    uint64_t current_time_ms, enum vpn_auth_result auth_result)
+{
+    struct vpn_session *session;
+
+    if (!table) {
+        return VPN_SESSION_ERR_INVALID_INPUT;
+    }
+
+    session = vpn_session_table_find_by_id(table, session_id);
+    if (!session) {
+        return VPN_SESSION_ERR_NOT_FOUND;
+    }
+
+    if (auth_result != VPN_AUTH_OK) {
+        return VPN_SESSION_ERR_AUTHENTICATION_FAILED;
+    }
+
+    session->state = VPN_SESSION_STATE_CLOSING;
+    session->last_seen_at_ms = current_time_ms;
+
+    return VPN_SESSION_OK;
+}
+
+int vpn_session_table_process_reject(struct vpn_session_table *table, uint64_t session_id,
+                                     uint64_t failed_message_id, enum vpn_auth_result auth_result)
+{
+    struct vpn_session *session;
+
+    if (!table) {
+        return VPN_SESSION_ERR_INVALID_INPUT;
+    }
+
+    session = vpn_session_table_find_by_id(table, session_id);
+    if (!session) {
+        return VPN_SESSION_ERR_NOT_FOUND;
+    }
+
+    if (failed_message_id == 0u || auth_result != VPN_AUTH_OK) {
+        return VPN_SESSION_ERR_AUTHENTICATION_FAILED;
+    }
+
+    if (failed_message_id <= session->last_message_id) {
+        return VPN_SESSION_OK;
+    }
+
+    session->last_message_id = failed_message_id;
+
+    return VPN_SESSION_OK;
+}
+
+int vpn_session_table_establish(struct vpn_session_table *table, uint64_t session_id, uint64_t current_time_ms)
+{
+    struct vpn_session *session;
+
+    if (!table) {
+        return VPN_SESSION_ERR_INVALID_INPUT;
+    }
+
+    session = vpn_session_table_find_by_id(table, session_id);
+    if (!session) {
+        return VPN_SESSION_ERR_NOT_FOUND;
+    }
+
+    if (session->state != VPN_SESSION_STATE_HANDSHAKE_IN_PROGRESS) {
+        return VPN_SESSION_ERR_INVALID_STATE;
+    }
+
+    session->state = VPN_SESSION_STATE_ESTABLISHED;
+    session->last_seen_at_ms = current_time_ms;
+
+    return VPN_SESSION_OK;
+}
+
+/* T048: Cleanup ownership - single cleanup function for retry exhaustion/timeout */
+int vpn_session_table_cleanup_session(struct vpn_session_table *table, uint64_t session_id)
+{
+    struct vpn_session *session;
+
+    if (!table) {
+        return VPN_SESSION_ERR_INVALID_INPUT;
+    }
+
+    session = vpn_session_table_find_by_id(table, session_id);
+    if (!session) {
+        return VPN_SESSION_ERR_NOT_FOUND;
+    }
+
+    session->assigned_virtual_ip = 0u;
+    session->peer_address.address = 0u;
+    session->peer_address.port = 0u;
+    session->handshake_deadline_ms = 0u;
+    session->pending_keepalive_message_id = 0u;
+    session->state = VPN_SESSION_STATE_EXPIRED;
+
+    return vpn_session_table_remove(table, session_id);
 }

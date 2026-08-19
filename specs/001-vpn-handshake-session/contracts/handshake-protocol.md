@@ -163,11 +163,14 @@ Required behavior:
 
 - Out-of-order messages that do not match the current state are rejected with
   `INVALID_STATE`.
-- Duplicate messages matching the previous accepted transition may receive the
-  same response.
+- Duplicate and stale messages are silently ignored and must not create
+  sessions, advance state, refresh liveness, or change peer mappings.
 - In-progress sessions expire after 10 seconds.
-- Each pending message may be retried 4 times with 1s, 2s, 4s, and 4s delays.
-- Established sessions send keepalive after 15 seconds of idleness.
+- Each pending message is transmitted at most 4 times total: the initial send
+  followed by retries at 1s, 3s, and 7s from handshake start. Retry exhaustion immediately fails
+  and cleans up the in-progress session.
+- Only the client sends keepalive after 15 seconds of idleness; the server
+  responds with `KEEPALIVE_ACK`.
 - Established sessions expire after 45 seconds without authenticated traffic.
 
 ## Security Note

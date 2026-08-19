@@ -122,13 +122,13 @@ int vpn_protocol_encode_envelope(uint8_t *data, size_t length, const struct vpn_
     vpn_protocol_write_u32(data, envelope->magic);
     data[4] = envelope->version;
     data[5] = envelope->type;
-    
+
     uint16_t raw_flags = htons(envelope->flags);
     memcpy(data + 6, &raw_flags, sizeof(raw_flags));
-    
+
     vpn_protocol_write_u32(data + 8, envelope->message_id);
     vpn_protocol_write_u64(data + 12, envelope->session_id);
-    
+
     uint16_t raw_payload_length = htons(envelope->payload_length);
     memcpy(data + 20, &raw_payload_length, sizeof(raw_payload_length));
 
@@ -159,17 +159,17 @@ int vpn_protocol_encode_client_hello(uint8_t *data, size_t length, const struct 
     data[offset++] = hello->client_id_length;
     memcpy(data + offset, hello->client_id, hello->client_id_length);
     offset += hello->client_id_length;
-    
+
     vpn_protocol_write_u32(data + offset, hello->requested_virtual_ip);
     offset += 4;
-    
+
     vpn_protocol_write_u32(data + offset, hello->client_nonce);
     offset += 4;
-    
+
     uint16_t raw_kex_len = htons(hello->key_exchange_length);
     memcpy(data + offset, &raw_kex_len, sizeof(raw_kex_len));
     offset += 2;
-    
+
     memcpy(data + offset, hello->key_exchange_bytes, hello->key_exchange_length);
     offset += hello->key_exchange_length;
 
@@ -431,6 +431,249 @@ int vpn_protocol_parse_server_finish(const uint8_t *data, size_t length, struct 
 
     memcpy(out->key_exchange_bytes, data + offset, out->key_exchange_length);
     offset += out->key_exchange_length;
+
+    return (int)offset;
+}
+/* T049: KEEPALIVE encode/decode */
+int vpn_protocol_encode_keepalive(uint8_t *data, size_t length, const struct vpn_protocol_keepalive *keepalive)
+{
+    if (!data || !keepalive) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
+    if (keepalive->session_id == 0u) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
+    size_t required_length = 8 + 8 + 1 + keepalive->authenticator_length;  /* session_id + timestamp_ms + auth_len + authenticator */
+    if (length < required_length) {
+        return VPN_PROTOCOL_ERR_INSUFFICIENT_LENGTH;
+    }
+
+    if (keepalive->authenticator_length > sizeof(keepalive->authenticator)) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
+    size_t offset = 0;
+    vpn_protocol_write_u64(data + offset, keepalive->session_id);
+    offset += 8;
+
+    vpn_protocol_write_u64(data + offset, keepalive->timestamp_ms);
+    offset += 8;
+
+    data[offset++] = keepalive->authenticator_length;
+    if (keepalive->authenticator_length > 0) {
+        memcpy(data + offset, keepalive->authenticator, keepalive->authenticator_length);
+        offset += keepalive->authenticator_length;
+    }
+
+    return (int)offset;
+}
+
+int vpn_protocol_parse_keepalive(const uint8_t *data, size_t length, struct vpn_protocol_keepalive *out)
+{
+    if (!data || !out || length < 8 + 8 + 1) {
+        return VPN_PROTOCOL_ERR_INSUFFICIENT_LENGTH;
+    }
+
+    size_t offset = 0;
+    out->session_id = vpn_protocol_read_u64(data + offset);
+    offset += 8;
+
+    out->timestamp_ms = vpn_protocol_read_u64(data + offset);
+    offset += 8;
+
+    out->authenticator_length = data[offset++];
+    if (out->authenticator_length > sizeof(out->authenticator)) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
+    if (length < offset + out->authenticator_length) {
+        return VPN_PROTOCOL_ERR_INSUFFICIENT_LENGTH;
+    }
+
+    if (out->authenticator_length > 0) {
+        memcpy(out->authenticator, data + offset, out->authenticator_length);
+        offset += out->authenticator_length;
+    } else {
+        memset(out->authenticator, 0, sizeof(out->authenticator));
+    }
+
+    return (int)offset;
+}
+
+/* KEEPALIVE_ACK encode/decode */
+int vpn_protocol_encode_keepalive_ack(uint8_t *data, size_t length, const struct vpn_protocol_keepalive_ack *ack)
+{
+    if (!data || !ack) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
+    if (ack->session_id == 0u) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
+    size_t required_length = 8 + 8 + 1 + ack->authenticator_length;  /* session_id + original_timestamp_ms + auth_len + authenticator */
+    if (length < required_length) {
+        return VPN_PROTOCOL_ERR_INSUFFICIENT_LENGTH;
+    }
+
+    if (ack->authenticator_length > sizeof(ack->authenticator)) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
+    size_t offset = 0;
+    vpn_protocol_write_u64(data + offset, ack->session_id);
+    offset += 8;
+
+    vpn_protocol_write_u64(data + offset, ack->original_timestamp_ms);
+    offset += 8;
+
+    data[offset++] = ack->authenticator_length;
+    if (ack->authenticator_length > 0) {
+        memcpy(data + offset, ack->authenticator, ack->authenticator_length);
+        offset += ack->authenticator_length;
+    }
+
+    return (int)offset;
+}
+
+int vpn_protocol_parse_keepalive_ack(const uint8_t *data, size_t length, struct vpn_protocol_keepalive_ack *out)
+{
+    if (!data || !out || length < 8 + 8 + 1) {
+        return VPN_PROTOCOL_ERR_INSUFFICIENT_LENGTH;
+    }
+
+    size_t offset = 0;
+    out->session_id = vpn_protocol_read_u64(data + offset);
+    offset += 8;
+
+    out->original_timestamp_ms = vpn_protocol_read_u64(data + offset);
+    offset += 8;
+
+    out->authenticator_length = data[offset++];
+    if (out->authenticator_length > sizeof(out->authenticator)) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
+    if (length < offset + out->authenticator_length) {
+        return VPN_PROTOCOL_ERR_INSUFFICIENT_LENGTH;
+    }
+
+    if (out->authenticator_length > 0) {
+        memcpy(out->authenticator, data + offset, out->authenticator_length);
+        offset += out->authenticator_length;
+    } else {
+        memset(out->authenticator, 0, sizeof(out->authenticator));
+    }
+
+    return (int)offset;
+}
+
+/* CLOSE encode/decode */
+int vpn_protocol_encode_close(uint8_t *data, size_t length, const struct vpn_protocol_close *close)
+{
+    if (!data || !close) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
+    if (close->session_id == 0u) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
+    size_t required_length = 8 + 1 + 1 + close->authenticator_length;  /* session_id + reason + auth_len + authenticator */
+    if (length < required_length) {
+        return VPN_PROTOCOL_ERR_INSUFFICIENT_LENGTH;
+    }
+
+    if (close->authenticator_length > sizeof(close->authenticator)) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
+    size_t offset = 0;
+    vpn_protocol_write_u64(data + offset, close->session_id);
+    offset += 8;
+
+    data[offset++] = close->reason;
+
+    data[offset++] = close->authenticator_length;
+    if (close->authenticator_length > 0) {
+        memcpy(data + offset, close->authenticator, close->authenticator_length);
+        offset += close->authenticator_length;
+    }
+
+    return (int)offset;
+}
+
+int vpn_protocol_parse_close(const uint8_t *data, size_t length, struct vpn_protocol_close *out)
+{
+    if (!data || !out || length < 8 + 1 + 1) {
+        return VPN_PROTOCOL_ERR_INSUFFICIENT_LENGTH;
+    }
+
+    size_t offset = 0;
+    out->session_id = vpn_protocol_read_u64(data + offset);
+    offset += 8;
+
+    out->reason = data[offset++];
+
+    out->authenticator_length = data[offset++];
+    if (out->authenticator_length > sizeof(out->authenticator)) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
+    if (length < offset + out->authenticator_length) {
+        return VPN_PROTOCOL_ERR_INSUFFICIENT_LENGTH;
+    }
+
+    if (out->authenticator_length > 0) {
+        memcpy(out->authenticator, data + offset, out->authenticator_length);
+        offset += out->authenticator_length;
+    } else {
+        memset(out->authenticator, 0, sizeof(out->authenticator));
+    }
+
+    return (int)offset;
+}
+
+/* REJECT encode/decode */
+int vpn_protocol_encode_reject(uint8_t *data, size_t length, const struct vpn_protocol_reject *reject)
+{
+    if (!data || !reject) {
+        return VPN_PROTOCOL_ERR_MALFORMED;
+    }
+
+    size_t required_length = 8 + 1 + 8;  /* session_id + rejection_code + failed_message_id */
+    if (length < required_length) {
+        return VPN_PROTOCOL_ERR_INSUFFICIENT_LENGTH;
+    }
+
+    size_t offset = 0;
+    vpn_protocol_write_u64(data + offset, reject->session_id);
+    offset += 8;
+
+    data[offset++] = reject->rejection_code;
+
+    vpn_protocol_write_u64(data + offset, reject->failed_message_id);
+    offset += 8;
+
+    return (int)offset;
+}
+
+int vpn_protocol_parse_reject(const uint8_t *data, size_t length, struct vpn_protocol_reject *out)
+{
+    if (!data || !out || length < 8 + 1 + 8) {
+        return VPN_PROTOCOL_ERR_INSUFFICIENT_LENGTH;
+    }
+
+    size_t offset = 0;
+    out->session_id = vpn_protocol_read_u64(data + offset);
+    offset += 8;
+
+    out->rejection_code = data[offset++];
+
+    out->failed_message_id = vpn_protocol_read_u64(data + offset);
+    offset += 8;
 
     return (int)offset;
 }

@@ -110,22 +110,22 @@
 
 ### Tests for User Story 3
 
-- [ ] T040 [P] [US3] Add unit tests for retry schedule 1s, 2s, 4s, 4s in tests/unit/test_handshake_state.c
-- [ ] T041 [P] [US3] Add unit tests for incomplete handshake expiration after 10 seconds in tests/unit/test_handshake_state.c
-- [ ] T042 [P] [US3] Add unit tests for established session expiration after 45 seconds in tests/unit/test_session_table.c
-- [ ] T043 [P] [US3] Add unit tests for duplicate, stale, and out-of-order control message handling in tests/unit/test_handshake_state.c
-- [ ] T044 [P] [US3] Add integration test for lost SERVER_HELLO retry exhaustion in tests/integration/test_handshake_flow.c
-- [ ] T045 [P] [US3] Add integration test for authenticated peer address rebinding in tests/integration/test_handshake_flow.c
+- [x] T040 [P] [US3] Add unit tests for retry schedule 1s, 3s, 7s in tests/unit/test_handshake_state.c
+- [x] T041 [P] [US3] Add unit tests for incomplete handshake expiration after 10 seconds in tests/unit/test_handshake_state.c
+- [x] T042 [P] [US3] Add unit tests for established session expiration after 45 seconds in tests/unit/test_session_table.c
+- [x] T043 [P] [US3] Add unit tests for duplicate, stale, and out-of-order control message handling in tests/unit/test_handshake_state.c
+- [x] T044 [P] [US3] Add integration test for lost SERVER_HELLO retry exhaustion in tests/integration/test_handshake_flow.c
+- [x] T045 [P] [US3] Add integration test for authenticated peer address rebinding in tests/integration/test_handshake_flow.c
 
 ### Implementation for User Story 3
 
-- [ ] T046 [US3] Implement retry policy calculation and retry exhaustion transitions in src/handshake.c
-- [ ] T047 [US3] Implement in-progress handshake timeout cleanup in src/handshake.c
-- [ ] T048 [US3] Implement session idle expiration and virtual IP release in src/session.c
-- [ ] T049 [US3] Implement KEEPALIVE, KEEPALIVE_ACK, CLOSE, and REJECT payload encode/decode in src/protocol.c
-- [ ] T050 [US3] Implement duplicate and out-of-order control message handling in src/handshake.c
-- [ ] T051 [US3] Implement authenticated peer address rebinding gate in src/session.c
-- [ ] T052 [US3] Document retry, timeout, keepalive, expiration, and rebinding behavior in docs/handshake-session.md
+- [x] T046 [US3] Implement retry policy calculation and retry exhaustion transitions in src/handshake.c
+- [x] T047 [US3] Implement in-progress handshake timeout cleanup in src/handshake.c
+- [x] T048 [US3] Implement session idle expiration and virtual IP release in src/session.c
+- [x] T049 [US3] Implement KEEPALIVE, KEEPALIVE_ACK, CLOSE, and REJECT payload encode/decode in src/protocol.c
+- [x] T050 [US3] Implement duplicate and out-of-order control message handling in src/handshake.c
+- [x] T051 [US3] Implement authenticated peer address rebinding gate in src/session.c
+- [x] T052 [US3] Document retry, timeout, keepalive, expiration, and rebinding behavior in docs/handshake-session.md
 
 **Checkpoint**: User Story 3 works independently after US1 and US2; loss and stale-session behavior are bounded and testable.
 
@@ -196,7 +196,7 @@ Task: "T033 [P] [US2] Add integration test for VIRTUAL_IP_CONFLICT rejection wit
 ## Parallel Example: User Story 3
 
 ```bash
-Task: "T040 [P] [US3] Add unit tests for retry schedule 1s, 2s, 4s, 4s in tests/unit/test_handshake_state.c"
+Task: "T040 [P] [US3] Add unit tests for retry schedule 1s, 3s, 7s in tests/unit/test_handshake_state.c"
 Task: "T042 [P] [US3] Add unit tests for established session expiration after 45 seconds in tests/unit/test_session_table.c"
 Task: "T045 [P] [US3] Add integration test for authenticated peer address rebinding in tests/integration/test_handshake_flow.c"
 ```

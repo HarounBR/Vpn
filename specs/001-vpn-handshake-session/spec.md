@@ -12,6 +12,25 @@
 - Q: How should the server handle a registration request for a virtual IP that
   is already owned by an active session? -> A: Reject the registration.
 
+### Session 2026-08-19
+
+- Q: How should `max_attempts = 4` count handshake transmissions? -> A: Count
+  the initial transmission as attempt 1; retry at 1s, 3s, and 7s from handshake start, then fail
+  after the fourth total transmission.
+- Q: What should happen after retry exhaustion? -> A: Immediately transition
+  the handshake to `FAILED`, remove partial session state, and release any
+  reserved virtual IP.
+- Q: Which peers send keepalives? -> A: Only the client sends a `KEEPALIVE`
+  after 15 seconds without authenticated traffic; the server replies with
+  `KEEPALIVE_ACK`, and valid authenticated keepalive traffic refreshes
+  `last_seen_at`.
+- Q: Which message may authenticate a changed UDP source address? -> A: Only
+  an authenticated `KEEPALIVE` from the new address may rebind the session;
+  other traffic must not change the stored peer address.
+- Q: How should duplicate and stale control messages be handled? -> A:
+  Silently ignore duplicate and stale messages; they must not create sessions,
+  advance state, refresh liveness, or change peer mappings.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Establish a Client Session (Priority: P1)
@@ -125,19 +144,30 @@ eventual session cleanup.
 - **FR-006**: The system MUST define how the server maps virtual IP addresses to
   active sessions and maps active sessions to real UDP peer addresses.
 - **FR-007**: The system MUST define when the real UDP peer address is first
-  recorded and whether it may be updated during an active session.
+  recorded and whether it may be updated during an active session. It is first
+  recorded from `CLIENT_HELLO` and may change only after an authenticated
+  `KEEPALIVE` from the new address passes replay checks.
 - **FR-008**: The system MUST define the exact conditions required before a
   session is considered established by the client and by the server.
 - **FR-009**: The system MUST reject data-plane traffic for sessions that are
   unknown, failed, expired, or not yet established.
 - **FR-010**: The system MUST define retry intervals, maximum retry counts, and
-  timeout behavior for each in-progress handshake state.
+  timeout behavior for each in-progress handshake state. The default policy is
+  four total transmissions per pending message, including the initial send,
+  with retries at 1s, 3s, and 7s from handshake start; exhaustion transitions the handshake to
+  `FAILED` immediately, removes partial session state, and releases any
+  reserved virtual IP.
 - **FR-011**: The system MUST define keepalive or last-seen behavior for
-  established sessions.
+  established sessions. Only the client sends `KEEPALIVE` after 15 seconds
+  without authenticated traffic; the server replies with `KEEPALIVE_ACK`.
+  Valid authenticated keepalive traffic refreshes `last_seen_at`.
 - **FR-012**: The system MUST define session expiration rules, including cleanup
   of virtual IP ownership and peer-address mappings.
 - **FR-013**: The system MUST define deterministic handling for duplicate,
-  delayed, out-of-order, and replayed control messages.
+  delayed, out-of-order, and replayed control messages. Duplicate and stale
+  messages are silently ignored and must not create sessions, advance state,
+  refresh liveness, or change peer mappings; genuinely out-of-order messages
+  are rejected with `INVALID_STATE`.
 - **FR-014**: The system MUST define observable outcomes for rejected control
   messages and failed handshakes.
 - **FR-015**: The system MUST state that the handshake and custom crypto are for

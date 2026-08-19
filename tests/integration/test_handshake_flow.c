@@ -58,16 +58,16 @@ static void test_clean_four_message_establishment(void)
     envelope.type = VPN_MSG_SERVER_FINISH;
     envelope.session_id = 1u;
     envelope.message_id = 13u;
-    
+
     /* Server doesn't receive its own SERVER_FINISH; client receives it */
     assert(vpn_handshake_process_envelope(&envelope, &client_ctx) == 0);
     /* Now client moves to ESTABLISHED */
     assert(client_ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_ESTABLISHED);
-    
+
     /* Verify both sides agreed on session_id */
     assert(client_ctx.session_id == server_ctx.session_id);
     assert(client_ctx.session_id == 1u);
-    
+
     /* Verify both are established */
     assert(client_ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_ESTABLISHED);
     assert(server_ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_ESTABLISHED);
@@ -78,27 +78,27 @@ static void test_reject_data_before_server_finish(void)
 {
     struct vpn_session_table table;
     struct vpn_session session;
-    
+
     vpn_session_table_init(&table);
-    
+
     /* Create a handshake-in-progress session */
     session.session_id = 1u;
     session.state = VPN_SESSION_STATE_HANDSHAKE_IN_PROGRESS;
     session.client_identity.client_id_length = 4;
     memcpy(session.client_identity.client_id, "test", 4);
-    
+
     assert(vpn_session_table_insert(&table, &session) == 0);
-    
+
     struct vpn_session *found = vpn_session_table_find_by_id(&table, 1u);
     assert(found != NULL);
     assert(found->state == VPN_SESSION_STATE_HANDSHAKE_IN_PROGRESS);
-    
+
     /* Data should be rejected during handshake */
     assert(vpn_session_can_accept_data(found) == 0);
-    
+
     /* Move to established */
     found->state = VPN_SESSION_STATE_ESTABLISHED;
-    
+
     /* Data should now be accepted */
     assert(vpn_session_can_accept_data(found) == 1);
 }
@@ -247,13 +247,13 @@ static void test_realistic_handshake_simulation(void)
     uint64_t server_assigned_session_id;
     uint8_t client_id[] = "client-1";
     uint32_t requested_vip = 0xC0A80001u;  /* 192.168.0.1 */
-    
+
     vpn_session_table_init(&table);
     vpn_handshake_context_init(&client_ctx, 0);
-    
+
     /* Server initializes with no session */
     vpn_handshake_context_init(&server_ctx, 0);
-    
+
     /* Step 1: Client builds and sends CLIENT_HELLO */
     envelope.magic = VPN_PROTOCOL_MAGIC;
     envelope.version = VPN_PROTOCOL_VERSION;
@@ -262,16 +262,16 @@ static void test_realistic_handshake_simulation(void)
     envelope.message_id = 1u;
     envelope.session_id = 0u;  /* No session yet */
     envelope.payload_length = 0u;
-    
+
     assert(vpn_handshake_process_envelope(&envelope, &client_ctx) == 0);
     assert(client_ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_HELLO_SENT);
-    
+
     /* Step 1b: Server creates session on receiving CLIENT_HELLO */
-    assert(vpn_session_table_create(&table, &server_assigned_session_id, 
-                                     client_id, sizeof(client_id) - 1, 
+    assert(vpn_session_table_create(&table, &server_assigned_session_id,
+                                     client_id, sizeof(client_id) - 1,
                                      0u) == 0);
     assert(server_assigned_session_id == 1u);
-    
+
     struct vpn_session *server_session = vpn_session_table_find_by_id(&table, server_assigned_session_id);
     assert(server_session != NULL);
     assert(server_session->state == VPN_SESSION_STATE_HANDSHAKE_IN_PROGRESS);
@@ -279,52 +279,52 @@ static void test_realistic_handshake_simulation(void)
     assert(vpn_handshake_reserve_virtual_ip(&table, server_assigned_session_id, requested_vip) == 0);
     assert(server_session->assigned_virtual_ip == requested_vip);
     assert(vpn_session_can_accept_data(server_session) == 0);
-    
+
     /* Initialize server context with the assigned session */
     vpn_handshake_context_init(&server_ctx, server_assigned_session_id);
-    
+
     /* Server receives CLIENT_HELLO */
     assert(vpn_handshake_process_envelope(&envelope, &server_ctx) == 0);
     assert(server_ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_HELLO_RECEIVED);
-    
+
     /* Step 2: Server sends SERVER_HELLO */
     envelope.type = VPN_MSG_SERVER_HELLO;
     envelope.session_id = server_assigned_session_id;
     envelope.message_id = 2u;
-    
+
     assert(vpn_handshake_process_envelope(&envelope, &server_ctx) == 0);
     assert(server_ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_SERVER_HELLO_SENT);
-    
+
     /* Client receives SERVER_HELLO */
     assert(vpn_handshake_process_envelope(&envelope, &client_ctx) == 0);
     assert(client_ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_FINISH_SENT);
     assert(client_ctx.session_id == server_assigned_session_id);
-    
+
     /* Step 3: Client sends CLIENT_FINISH */
     envelope.type = VPN_MSG_CLIENT_FINISH;
     envelope.session_id = server_assigned_session_id;
     envelope.message_id = 3u;
-    
+
     assert(vpn_handshake_process_envelope(&envelope, &client_ctx) == 0);
     /* Client stays in FINISH_SENT, waiting for SERVER_FINISH */
     assert(client_ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_FINISH_SENT);
-    
+
     /* Server receives CLIENT_FINISH */
     assert(vpn_handshake_process_envelope(&envelope, &server_ctx) == 0);
     assert(server_ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_ESTABLISHED);
-    
+
     /* Step 4: Server sends SERVER_FINISH */
     envelope.type = VPN_MSG_SERVER_FINISH;
     envelope.session_id = server_assigned_session_id;
     envelope.message_id = 4u;
-    
+
     /* Client receives SERVER_FINISH and moves to ESTABLISHED */
     assert(vpn_handshake_process_envelope(&envelope, &client_ctx) == 0);
     assert(client_ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_ESTABLISHED);
-    
+
     /* Step 5: Mark session as established on server */
     server_session->state = VPN_SESSION_STATE_ESTABLISHED;
-    
+
     /* Verify all expectations */
     assert(client_ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_ESTABLISHED);
     assert(server_ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_ESTABLISHED);
@@ -334,6 +334,143 @@ static void test_realistic_handshake_simulation(void)
     assert(server_session->assigned_virtual_ip == requested_vip);
 }
 
+/* T044: Lost SERVER_HELLO retry exhaustion test */
+static void test_lost_server_hello_retry_exhaustion(void)
+{
+    struct vpn_session_table table;
+    struct vpn_handshake_context client_ctx;
+    struct vpn_handshake_context server_ctx;
+    struct vpn_protocol_envelope envelope;
+    uint64_t session_id = 0u;
+    uint8_t client_id[] = "client-retry";
+    uint32_t requested_vip = 0x0A000010u;
+
+    vpn_session_table_init(&table);
+    vpn_handshake_context_init(&client_ctx, 0u);
+    vpn_handshake_context_init(&server_ctx, 0u);
+
+    /* Step 1: Client sends CLIENT_HELLO */
+    envelope.magic = VPN_PROTOCOL_MAGIC;
+    envelope.version = VPN_PROTOCOL_VERSION;
+    envelope.type = VPN_MSG_CLIENT_HELLO;
+    envelope.flags = 0;
+    envelope.message_id = 1u;
+    envelope.session_id = 0u;
+    envelope.payload_length = 0u;
+
+    assert(vpn_handshake_process_envelope(&envelope, &client_ctx) == 0);
+    assert(client_ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_HELLO_SENT);
+
+    /* Server creates session */
+    assert(vpn_session_table_create(&table, &session_id,
+                                   (const uint8_t *)client_id,
+                                   (uint8_t)strlen((const char *)client_id),
+                                   0u) == 0);
+    assert(session_id != 0u);
+
+    struct vpn_session *server_session = vpn_session_table_find_by_id(&table, session_id);
+    assert(server_session != NULL);
+    assert(server_session->state == VPN_SESSION_STATE_HANDSHAKE_IN_PROGRESS);
+
+    assert(vpn_handshake_reserve_virtual_ip(&table, session_id, requested_vip) == 0);
+    assert(server_session->assigned_virtual_ip == requested_vip);
+
+    vpn_handshake_context_init(&server_ctx, session_id);
+    assert(vpn_handshake_process_envelope(&envelope, &server_ctx) == 0);
+    assert(server_ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_HELLO_RECEIVED);
+
+    /* Server sends SERVER_HELLO (but we simulate it being lost by not delivering to client) */
+    envelope.type = VPN_MSG_SERVER_HELLO;
+    envelope.session_id = session_id;
+    envelope.message_id = 2u;
+    assert(vpn_handshake_process_envelope(&envelope, &server_ctx) == 0);
+    assert(server_ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_SERVER_HELLO_SENT);
+
+    /* Client never receives SERVER_HELLO - simulate retry exhaustion using real functions */
+    uint64_t current_time = 1000u;
+    assert(vpn_handshake_on_handshake_start(&server_ctx, current_time) == 0);
+    assert(server_ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_SERVER_HELLO_SENT);
+    assert(server_ctx.attempt_count == 1u);
+
+    /* Simulate 4 total attempts (initial + 3 retries) using real retry function */
+    /* Attempt 1 (initial) already counted */
+
+    /* 1st retry after 1s */
+    assert(vpn_handshake_advance_retry(&server_ctx, 2000u, &table) == 0);
+    assert(server_ctx.attempt_count == 2);
+    assert(vpn_handshake_should_retry(&server_ctx) == 1);
+
+    /* 2nd retry after 2s (cumulative 3s) */
+    assert(vpn_handshake_advance_retry(&server_ctx, 4000u, &table) == 0);
+    assert(server_ctx.attempt_count == 3);
+    assert(vpn_handshake_should_retry(&server_ctx) == 1);
+
+    /* 3rd retry after 4s (cumulative 7s) */
+    assert(vpn_handshake_advance_retry(&server_ctx, 8000u, &table) == 0);
+    assert(server_ctx.attempt_count == 4);
+    /* After 4 total attempts (initial + 3 retries), should_retry returns 0 */
+    assert(vpn_handshake_should_retry(&server_ctx) == 0);
+
+    /* 4th attempt - exhausted */
+    assert(vpn_handshake_advance_retry(&server_ctx, 15000u, &table) == -1);
+    assert(server_ctx.client_state == VPN_CLIENT_HANDSHAKE_STATE_FAILED);
+    assert(server_ctx.server_state == VPN_SERVER_HANDSHAKE_STATE_FAILED);
+
+    /* Retry exhaustion owns complete cleanup. */
+    assert(vpn_session_table_find_by_id(&table, session_id) == NULL);
+    assert(vpn_session_table_find_by_virtual_ip(&table, requested_vip) == NULL);
+}
+
+/* T045: Authenticated peer address rebinding test */
+static void test_authenticated_peer_address_rebinding(void)
+{
+    struct vpn_session_table table;
+    uint64_t session_id = 0u;
+    uint8_t client_id[] = "client-rebind";
+    struct vpn_session *session;
+
+    vpn_session_table_init(&table);
+
+    /* Establish a session - initial peer capture happens during handshake */
+    assert(vpn_session_table_create(&table, &session_id,
+                                   (const uint8_t *)client_id,
+                                   (uint8_t)strlen((const char *)client_id),
+                                   0u) == 0);
+    assert(session_id != 0u);
+
+    assert(vpn_handshake_reserve_virtual_ip(&table, session_id, 0x0A000020u) == 0);
+    session = vpn_session_table_find_by_id(&table, session_id);
+    assert(session != NULL);
+    session->state = VPN_SESSION_STATE_HANDSHAKE_IN_PROGRESS;
+
+    /* Initial peer capture during handshake (from CLIENT_HELLO) */
+    assert(vpn_session_table_capture_client_hello_peer(&table, session_id, 0xC0A80001u, 1194u) == 0);
+    assert(session->peer_address.address == 0xC0A80001u);
+    assert(session->peer_address.port == 1194u);
+
+    /* Now establish the session */
+    session->state = VPN_SESSION_STATE_ESTABLISHED;
+
+    /* Try to update peer address with unauthenticated traffic from new address - should fail */
+    assert(vpn_session_table_process_keepalive(&table, session_id, 10001u, 2u,
+                                               0xC0A80002u, 1195u, VPN_AUTH_FAILED) != VPN_SESSION_OK);
+    assert(session->peer_address.address == 0xC0A80001u);  /* Should remain unchanged */
+
+    /* Authenticated keepalive from new address should succeed */
+    assert(vpn_session_table_process_keepalive(&table, session_id, 10002u, 3u,
+                                               0xC0A80002u, 1195u, VPN_AUTH_OK) == VPN_SESSION_OK);
+    assert(session->peer_address.address == 0xC0A80002u);
+    assert(session->peer_address.port == 1195u);
+    assert(session->last_seen_at_ms == 10002u);  /* liveness updated */
+
+    /* Verify outbound lookup works with new peer address */
+    struct vpn_session *found = vpn_session_table_lookup_outbound(&table, 0x0A000020u);
+    assert(found != NULL);
+    assert(found->session_id == session_id);
+    assert(found->peer_address.address == 0xC0A80002u);
+    assert(found->peer_address.port == 1195u);
+}
+
 int test_handshake_flow(void)
 {
     test_clean_four_message_establishment();
@@ -341,6 +478,10 @@ int test_handshake_flow(void)
     test_three_simultaneous_clients_virtual_ip_lookup();
     test_virtual_ip_conflict_rejection();
     test_realistic_handshake_simulation();
+    /* T044: Lost SERVER_HELLO retry exhaustion test */
+    test_lost_server_hello_retry_exhaustion();
+    /* T045: Authenticated peer address rebinding test */
+    test_authenticated_peer_address_rebinding();
     printf("test_handshake_flow.c passed\n");
     return 0;
 }

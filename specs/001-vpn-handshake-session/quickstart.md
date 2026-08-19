@@ -37,8 +37,9 @@ Expected result: active virtual IP ownership is stable and deterministic.
 
 1. Drop the first `SERVER_HELLO`.
 2. Let the retry interval elapse.
-3. Verify the sender retries according to 1s, 2s, 4s, 4s bounded delays.
-4. Verify retry exhaustion transitions the in-progress session to `FAILED`.
+3. Verify the initial send is followed by retries at 1s, 3s, and 7s from handshake start.
+4. Verify the fourth total transmission failing transitions the in-progress
+   session to `FAILED` and cleans up its partial state.
 
 Expected result: loss has bounded behavior and does not leave stale partial
 session state.
