@@ -73,7 +73,16 @@ Expected result: NAT rebinding is supported only after session authentication.
 Expected result: each invalid case produces the documented rejection outcome or
 idempotent duplicate response.
 
-## Next Step
+## Phase 6 Validation Record
 
-Run `/speckit-tasks` after this plan is accepted to generate implementation
-tasks.
+### 2026-08-20
+
+- Environment: Linux, GCC 13.3.0, C11 build, no external dependencies.
+- Command: `make clean && make test`
+- Result: 4 test suites passed, 0 failed.
+- Command: `git diff --check`
+- Result: passed with no whitespace errors.
+- Command: `make clean && make CFLAGS='-std=c11 -Wall -Wextra -Wpedantic -O2 -Iinclude'`
+- Result: passed with no compiler warnings.
+- Command: `clang-format --version`
+- Result: unavailable in the environment; formatting was reviewed manually.

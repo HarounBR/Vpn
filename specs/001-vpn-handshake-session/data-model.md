@@ -81,7 +81,9 @@ begins.
 - `peer_address` is first recorded from `CLIENT_HELLO`.
 - After establishment, `peer_address` may update only after authenticated
   session traffic passes validation.
-- A session with expired `expires_at` is removed and releases its virtual IP.
+- A handshake with an expired `handshake_deadline_ms`, or an established
+  session with an expired `last_seen_at + session_idle_timeout_ms`, is removed
+  and releases its virtual IP.
 
 ## VirtualIPAssignment
 

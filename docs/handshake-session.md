@@ -111,7 +111,7 @@ NO_SESSION → HELLO_RECEIVED → SERVER_HELLO_SENT → ESTABLISHED
 
 The handshake uses an exponential backoff retry schedule with a maximum of 4 total transmission attempts (1 initial + 3 retries):
 
-| Attempt | Delay | Cumulative |
+| Attempt | Delay since previous attempt | Cumulative |
 |---------|-------|------------|
 | 1 (initial) | 0s | 0s |
 | 2 (retry) | 1s | 1s |

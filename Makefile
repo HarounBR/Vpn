@@ -1,5 +1,5 @@
 CC  := gcc
-CFLAGS := -std=c11 -Wall -Wextra -Wpedantic -Iinclude
+CFLAGS := -std=c11 -Wall -Wextra -Wpedantic -O2 -Iinclude
 TEST_SRCS := $(wildcard tests/unit/*.c) $(wildcard tests/integration/*.c) tests/test_runner.c
 SRC := src/protocol.c src/handshake.c src/session.c
 OBJS := $(SRC:.c=.o) $(TEST_SRCS:.c=.o)
@@ -7,7 +7,7 @@ OBJS := $(SRC:.c=.o) $(TEST_SRCS:.c=.o)
 
 
 vpn_handshake_tests: $(OBJS)
-	$(CC)  $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@ 

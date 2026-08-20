@@ -135,10 +135,17 @@
 
 **Purpose**: Tighten validation, documentation, and maintainability across all stories.
 
-- [ ] T053 Run the full C test target and record results in specs/001-vpn-handshake-session/quickstart.md
-- [ ] T054 Review protocol constants against specs/001-vpn-handshake-session/contracts/handshake-protocol.md
-- [ ] T055 Review docs/handshake-session.md to ensure it states the protocol is educational and not production-grade security
-- [ ] T056 Run formatting or style checks for include/vpn/protocol.h, include/vpn/handshake.h, include/vpn/session.h, src/protocol.c, src/handshake.c, and src/session.c
+- [x] T053 Run the full C test target and add a dated validation record to
+  specs/001-vpn-handshake-session/quickstart.md containing the commands run,
+  test environment, and pass/fail summary
+- [x] T054 Review protocol constants against
+  specs/001-vpn-handshake-session/contracts/handshake-protocol.md; treat the
+  implemented C behavior as authoritative and update the contract for any
+  intentional differences while preserving the educational scope
+- [x] T055 Review docs/handshake-session.md to ensure it states the protocol is educational and not production-grade security
+- [x] T056 Run compiler-warning checks and `git diff --check`; run `clang-format`
+  on include/vpn/protocol.h, include/vpn/handshake.h, include/vpn/session.h,
+  src/protocol.c, src/handshake.c, and src/session.c when available
 
 ---
 

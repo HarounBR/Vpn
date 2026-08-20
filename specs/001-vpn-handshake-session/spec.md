@@ -31,6 +31,17 @@
   Silently ignore duplicate and stale messages; they must not create sessions,
   advance state, refresh liveness, or change peer mappings.
 
+### Session 2026-08-20
+
+- Q: Which style-check policy should T056 implement? -> A: Use compiler
+  warnings and `git diff --check`, plus `clang-format` when available.
+- Q: How should T053 record test results? -> A: Add a dated validation record
+  to `quickstart.md` containing the commands run, test environment, and
+  pass/fail summary.
+- Q: How should T054 resolve protocol constant mismatches? -> A: Treat the
+  implemented C behavior as authoritative and update the protocol contract to
+  match it, preserving the educational scope.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Establish a Client Session (Priority: P1)
