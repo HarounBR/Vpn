@@ -1,3 +1,3 @@
 <!-- SPECKIT START -->
-Current plan: specs/001-vpn-handshake-session/plan.md
+Current plan: specs/002-crypto-key-exchange/plan.md
 <!-- SPECKIT END -->
